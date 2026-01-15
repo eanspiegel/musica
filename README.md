@@ -23,14 +23,10 @@ Agrega la carpeta `bin`(del directorio ffmpeg) a tu PATH
 python musica.py 
 ```
 
-### Ejemplo
+### Ejecución
 
-Te pedirá que pongas el enlaces de la lista de reprodución de YT, ahí tu ves si quieres descargar el video o solo el audio
+Te pedirá que pongas el enlace de la lista de reprodución de YT, ahí tu ves si quieres descargar el video o solo el audio y ya eso es todo, el menú es con números y todo es intuitivo, creo
 
-
-## Características
-
-ya las pongo que primero voy a crear el repo
 
 ## Notas
 
