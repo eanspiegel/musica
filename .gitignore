@@ -1,2 +1,11 @@
 playlist/
-.env
+.DS_Store
+Thumbs.db
+config.json
+
+__pycache__/
+*.pyc
+
+build/
+dist/
+*.spec

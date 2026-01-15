@@ -9,6 +9,11 @@ Hice esto porque ya me dió pereza pedirle el ytdownloader a mi pana y es tarde 
 
 python -m pip install -r requirements.txt
 
+## Notas v2.0.0
+
+- Cree un `.exe` para que no instales las librerías de forma manual la interfaz grafica para mañana(cuando me vuelva la inspiración)
+- Ahora cuando de termine el menú te pedirá donde lo quieres guardad, abriendo el explorador de archivos
+- Tener ffmpeg sigue siendo obligatorio
 
 ### Instalar FFmpeg (esto es para pasarlo a mp3)
 
@@ -22,19 +27,19 @@ Agrega la carpeta `bin`(del directorio ffmpeg) a tu PATH
 ## Uso
 
 ```bash
-python musica.py 
+python musica.py
+o
+ejecutar MusicaDownloader_v2.exe
 ```
 
 ### Ejecución
 
-Te pedirá que pongas el enlace de la lista de reprodución de YT, ahí tu ves si quieres descargar el video o solo el audio y ya eso es todo, el menú es con números y todo es intuitivo, creo
-
+Te pedirá que pongas el enlace de la lista de reprodución de YT, ahí tu ves si quieres descargar el video o solo el audio y ya eso es todo, el menú es con números y todo es intuitivo, "creo".
 
 ## Notas
 
 - Las canciones se guardan con el título del video como nombre de archivo
-- Crea un archivo `.env` o borra el `.example` del archivo `.env.example` y ahí pones la ruta donde quieras que se guarden las canciones
--Algo que me pasó probando es que debes tener cuidado cuando copias el enlaces, aveces copias sin querer una playlist, igual el codigo te muestra cuantas canciones de van a descargar, pero pilas con eso
--Creo que hay un problema con la calidad de video o estas son las pruebas que hice: 
-    144p: se descarga el video a esa calidad pero el audio no lo incorpora(Igual no creo que vayas a descargar el video en esa calidad)
-    720 y 1080: tengo mis dudas porque siento que 1080 es 720 y 720 parece 480, igual es porque soy tremendo ciego
+- Algo que me pasó probando es que debes tener cuidado cuando copias el enlaces, aveces copias sin querer una playlist, igual el codigo te muestra cuantas canciones de van a descargar, pero pilas con eso
+
+
+
