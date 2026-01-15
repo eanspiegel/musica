@@ -2,9 +2,10 @@
 
 - Python 3.x
 - yt-dlp
+- python-dotenv
 - FFmpeg (necesario para convertir a MP3)
 
-python -m pip install yt-dlp
+python -m pip install -r requirements.txt
 
 
 ### Instalar FFmpeg (esto es para pasarlo a mp3)
@@ -24,9 +25,8 @@ python musica.py
 
 ### Ejemplo
 
-```bash
-python musica.py 
-```
+Te pedirá que pongas el enlaces de la lista de reprodución de YT, ahí tu ves si quieres descargar el video o solo el audio
+
 
 ## Características
 
@@ -35,5 +35,8 @@ ya las pongo que primero voy a crear el repo
 ## Notas
 
 - Las canciones se guardan con el título del video como nombre de archivo
-- Si la carpeta `playlist/` no existe, se crea automáticamente
-
+- Crea un archivo `.env` o borra el `.example` del archivo `.env.example` y ahí pones la ruta donde quieras que se guarden las canciones
+-Algo que me pasó probando es que debes tener cuidado cuando copias el enlaces, aveces copias sin querer una playlist, igual el codigo te muestra cuantas canciones de van a descargar, pero pilas con eso
+-Creo que hay un problema con la calidad de video o estas son las pruebas que hice: 
+    144p: se descarga el video a esa calidad pero el audio no lo incorpora(Igual no creo que vayas a descargar el video en esa calidad)
+    720 y 1080: tengo mis dudas porque siento que 1080 es 720 y 720 parece 480, igual es porque soy tremendo ciego
