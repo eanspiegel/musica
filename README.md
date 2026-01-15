@@ -4,7 +4,6 @@ Hice esto porque ya me dió pereza pedirle el ytdownloader a mi pana y es tarde 
 
 - Python 3.x
 - yt-dlp
-- python-dotenv
 - FFmpeg (necesario para convertir a MP3)
 
 python -m pip install -r requirements.txt
