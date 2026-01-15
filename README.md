@@ -1,5 +1,7 @@
 # Descargador de Playlist de YouTube
 
+Hice esto porque ya me dió pereza pedirle el ytdownloader a mi pana y es tarde y no quiero esperar hasta el otro día
+
 - Python 3.x
 - yt-dlp
 - python-dotenv
