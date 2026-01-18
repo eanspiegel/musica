@@ -76,6 +76,7 @@ class MainWindow(tk.Tk):
         self.resizable(True, True)
         
         self.video_data = None 
+        self.last_img_data = None # Para guardar la imagen en memoria
         self.image_references = [] # Para evitar Garbage Collection de imágenes
         
         self._init_ui()
@@ -101,40 +102,20 @@ class MainWindow(tk.Tk):
         self.entry_url.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         self.entry_url.focus()
         
+        self.entry_url.focus()
+        
         self.btn_analizar = ttk.Button(input_frame, text="🔍 ANALIZAR", command=self._on_analizar_click, style="Accent.TButton", width=15)
         self.btn_analizar.pack(side=tk.RIGHT)
+        
+        # --- VARIABLES DE FORMATO (Globales) ---
+        self.audio_format_var = tk.StringVar(value="mp3")
+        self.video_format_var = tk.StringVar(value="mp4")
 
         # Dynamic Content Area (Scrollable if needed, but we use a big frame)
         self.dynamic_frame = ttk.Frame(self)
         self.dynamic_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-    def _on_analizar_click(self):
-        url = self.url_var.get().strip()
-        if not url: return
-        
-        self.btn_analizar.config(state="disabled")
-        # Limpiar referencias
-        self.image_references = []
-        
-        # Thread para no bloquear UI
-        threading.Thread(target=self._proceso_analisis, args=(url,), daemon=True).start()
-        
-    def _proceso_analisis(self, url):
-        self.video_data, error = self.youtube_service.obtener_info_basica(url)
-        
-        # Volver al thread principal interactuando con UI
-        self.after(0, self._post_analisis)
-
-    def _post_analisis(self):
-        if not self.video_data:
-            messagebox.showerror("Error", "No se pudo obtener la información. Verifica el link.")
-            self.btn_analizar.config(state="normal")
-            return
-            
-        self._mostrar_opciones_principales()
-        self.btn_analizar.config(state="normal")
-        
-        # --- DIRECTORIO ---
+        # --- DIRECTORIO (Ahora fijo en init) ---
         dir_frame = ttk.Frame(self, padding="0 10 0 0")
         dir_frame.pack(fill=tk.X, pady=10, padx=20)
         
@@ -150,6 +131,41 @@ class MainWindow(tk.Tk):
         
         self.status_var = tk.StringVar(value="Esperando enlace...")
         ttk.Label(self, textvariable=self.status_var, font=("Segoe UI", 9), foreground="#666").pack(anchor="w", padx=20)
+        
+    def _on_analizar_click(self):
+        url = self.url_var.get().strip()
+        if not url: return
+        
+        self.btn_analizar.config(state="disabled")
+        # Limpiar referencias
+        self.image_references = []
+        
+        # Thread para no bloquear UI
+        threading.Thread(target=self._proceso_analisis, args=(url,), daemon=True).start()
+        
+    def _proceso_analisis(self, url):
+        self.video_data, error = self.youtube_service.obtener_info_basica(url)
+        self.last_img_data = None
+        
+        if self.video_data and self.video_data.get('thumbnail'):
+            try:
+                resp = requests.get(self.video_data['thumbnail'], timeout=10)
+                if resp.status_code == 200:
+                    self.last_img_data = BytesIO(resp.content)
+            except Exception as e:
+                print(f"Error descargando thumbnail principal: {e}")
+        
+        # Volver al thread principal interactuando con UI
+        self.after(0, self._post_analisis)
+
+    def _post_analisis(self):
+        if not self.video_data:
+            messagebox.showerror("Error", "No se pudo obtener la información. Verifica el link.")
+            self.btn_analizar.config(state="normal")
+            return
+            
+        self._mostrar_opciones_principales()
+        self.btn_analizar.config(state="normal")
 
     def cambiar_directorio(self):
         ruta = filedialog.askdirectory()
@@ -351,44 +367,82 @@ class MainWindow(tk.Tk):
                 ttk.Button(btn_sel_frame, text="Marcar Todas", width=15, command=self.sel_all).pack(side=tk.LEFT, padx=(0, 10))
                 ttk.Button(btn_sel_frame, text="Desmarcar Todas", width=15, command=self.sel_none).pack(side=tk.LEFT)
 
-        # --- BOTONES DE DESCARGA (Siempre visibles abajo) ---
-        btns_container = ttk.Frame(self.dynamic_frame)
-        btns_container.pack(fill=tk.X, pady=(10, 0))
+        # --- ÁREA INFERIOR DINÁMICA DE DESCARGA ---
+        self.btns_container = ttk.Frame(self.dynamic_frame)
+        self.btns_container.pack(fill=tk.X, pady=(20, 0))
         
-        # Audio
-        audio_frame = ttk.Labelframe(btns_container, text="Solo Audio 🎵", padding=10)
-        audio_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
-        
-        self.audio_format_var = tk.StringVar(value="mp3")
-        # Radiobuttons may need styling, defaults to transparent text which picks up background
-        ttk.Radiobutton(audio_frame, text="MP3", variable=self.audio_format_var, value="mp3").pack(anchor="w")
-        ttk.Radiobutton(audio_frame, text="Opus (HQ)", variable=self.audio_format_var, value="opus").pack(anchor="w")
-        
-        # Check descargando selection logic for audio too
-        cmd_audio = lambda: self.iniciar_descarga_final(es_video=False, is_playlist=(self.video_data['type'] == 'playlist'))
-        ttk.Button(audio_frame, text="Descargar Audio", command=cmd_audio).pack(fill=tk.X, pady=(10, 0))
-        
-        # Video
-        video_frame = ttk.Labelframe(btns_container, text="Video Completo 🎬", padding=10)
-        video_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
-        
-        self.video_format_var = tk.StringVar(value="mp4")
-        ttk.Radiobutton(video_frame, text="MP4", variable=self.video_format_var, value="mp4").pack(anchor="w")
-        ttk.Radiobutton(video_frame, text="VP9/WebM", variable=self.video_format_var, value="webm").pack(anchor="w")
-        
-        if self.video_data['type'] == 'playlist':
-            # Updated text to be clear
-            btn_vid_text = "Descargar Selección"
-            cmd_video = lambda: self.iniciar_descarga_final(es_video=True, is_playlist=True)
-        else:
-            btn_vid_text = "Elegir Calidad"
-            cmd_video = lambda: self.iniciar_descarga_final(es_video=True)
+        self._mostrar_inicio_descarga()
 
-        # Botón primario de video en ACENTO (Verde)
-        ttk.Button(video_frame, text=btn_vid_text, command=cmd_video, style="Accent.TButton").pack(fill=tk.X, pady=(10, 0))
+    def _mostrar_inicio_descarga(self):
+        # Limpiar contenedor
+        for w in self.btns_container.winfo_children(): w.destroy()
         
-        ttk.Button(self.dynamic_frame, text="Limpiar", 
-                   command=lambda: [self._limpiar_frame_dinamico(), self.url_var.set("")]).pack(pady=15)
+        # Dos grandes botones
+        frame_btns = ttk.Frame(self.btns_container)
+        frame_btns.pack(fill=tk.X, expand=True)
+        
+        # Boton Audio
+        btn_audio = ttk.Button(frame_btns, text="🎵 Solo Audio", command=self._mostrar_opciones_audio, style="Accent.TButton")
+        btn_audio.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10), ipady=10)
+        
+        # Boton Video
+        btn_video = ttk.Button(frame_btns, text="🎬 Video Completo", command=self._mostrar_opciones_video, style="Accent.TButton")
+        btn_video.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0), ipady=10)
+        
+        # Limpiar
+        ttk.Button(self.btns_container, text="Limpiar Todo", 
+                   command=lambda: [self._limpiar_frame_dinamico(), self.url_var.set("")]).pack(pady=20)
+
+    def _mostrar_opciones_audio(self):
+        for w in self.btns_container.winfo_children(): w.destroy()
+        
+        # Cabecera con boton volver
+        header = ttk.Frame(self.btns_container)
+        header.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Button(header, text="⬅ Volver", width=10, command=self._mostrar_inicio_descarga).pack(side=tk.LEFT)
+        ttk.Label(header, text="Configuración de Audio", font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT, padx=20)
+        
+        # Opciones
+        opts_frame = ttk.Frame(self.btns_container, style="FlatCard.TFrame", padding=15)
+        opts_frame.pack(fill=tk.X)
+        
+        # self.audio_format_var ya existe globalmente
+        
+        # Estilos custom para que se vea bien en el fondo
+        style = ttk.Style()
+        style.configure("Surface.TRadiobutton", background=self.CTX_SURFACE, foreground=self.CTX_TEXT, font=("Segoe UI", 10))
+        
+        ttk.Radiobutton(opts_frame, text="MP3 (Más compatible)", variable=self.audio_format_var, value="mp3", style="Surface.TRadiobutton").pack(anchor="w", pady=5)
+        ttk.Radiobutton(opts_frame, text="Opus (Mejor calidad)", variable=self.audio_format_var, value="opus", style="Surface.TRadiobutton").pack(anchor="w", pady=5)
+        
+        # Boton Descargar
+        cmd = lambda: self.iniciar_descarga_final(es_video=False, is_playlist=(self.video_data['type'] == 'playlist'))
+        ttk.Button(opts_frame, text="⬇ COMENZAR DESCARGA", command=cmd, style="Accent.TButton").pack(fill=tk.X, pady=(15, 0))
+
+    def _mostrar_opciones_video(self):
+        # Limpiar contenedor
+        for w in self.btns_container.winfo_children(): w.destroy()
+        
+        is_playlist = (self.video_data.get('type') == 'playlist')
+        
+        header = ttk.Frame(self.btns_container)
+        header.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Button(header, text="⬅ Volver", width=10, command=self._mostrar_inicio_descarga).pack(side=tk.LEFT)
+        title_text = "Configuración de Video (Playlist)" if is_playlist else "Configuración de Video"
+        ttk.Label(header, text=title_text, font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT, padx=20)
+        
+        opts_frame = ttk.Frame(self.btns_container, style="FlatCard.TFrame", padding=15)
+        opts_frame.pack(fill=tk.X)
+        
+        ttk.Radiobutton(opts_frame, text="MP4 (Más compatible)", variable=self.video_format_var, value="mp4", style="Surface.TRadiobutton").pack(anchor="w", pady=5)
+        ttk.Radiobutton(opts_frame, text="VP9/WebM (Mejor calidad)", variable=self.video_format_var, value="webm", style="Surface.TRadiobutton").pack(anchor="w", pady=5)
+        
+        # Si es playlist descarga directa, si es video va a elegir calidad
+        cmd = lambda: self.iniciar_descarga_final(es_video=True, is_playlist=is_playlist)
+        btn_text = "⬇ COMENZAR DESCARGA" if is_playlist else "➜ CONTINUAR"
+        ttk.Button(opts_frame, text=btn_text, command=cmd, style="Accent.TButton").pack(fill=tk.X, pady=(15, 0))
 
     def sel_all(self):
         for var in self.playlist_vars: var.set(1)
@@ -399,20 +453,24 @@ class MainWindow(tk.Tk):
     def mostrar_selector_calidad_inline(self, calidades, video_cont, event_obj, result_container):
         self._limpiar_frame_dinamico()
         
-        # Restore basic preview info at top? Optional, but keeping simple for now.
-        # Or I can show the preview here too!
-        # Let's keep it simple first.
-        
-        lbl_c = ttk.Label(self.dynamic_frame, text=f"Calidades Disponibles ({video_cont.upper()})", style="Header.TLabel")
+        lbl_c = ttk.Label(self.dynamic_frame, text=f"Calidades Disponibles ({video_cont.upper()})", font=("Segoe UI", 12, "bold"), foreground=self.CTX_ACCENT)
         lbl_c.pack(pady=(0, 10))
         
-        canvas = tk.Canvas(self.dynamic_frame, height=250)
-        scrollbar = ttk.Scrollbar(self.dynamic_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
+        # Canvas con fondo oscuro
+        canvas = tk.Canvas(self.dynamic_frame, height=250, background=self.CTX_BG, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.dynamic_frame, orient="vertical", command=canvas.yview, style="Vertical.TScrollbar")
+        
+        # Frame interno scrollable
+        scrollable_frame = ttk.Frame(canvas, style="TFrame")
         
         scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw", width=540)
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw", width=540) # Width ajustado
         canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Bind MouseWheel Globalmente mientras exista esta vista
+        canvas.bind_all("<MouseWheel>", lambda event: canvas.yview_scroll(int(-1*(event.delta/120)), "units"))
+        # Unbind al destruir (limpieza)
+        scrollable_frame.bind("<Destroy>", lambda e: canvas.unbind_all("<MouseWheel>"))
         
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
@@ -422,16 +480,23 @@ class MainWindow(tk.Tk):
             event_obj.set()
         
         ordenadas = sorted(calidades.items(), reverse=True)
+        # Mejor calidad primero (si existe key 0 o similar, ajustar logica, pero sorted reverse funciona para resoluciones numericas si keys son int)
+        # En utils.py keys son int (res) o 'best'
         
+        # Estilo custom para botones de lista (Surface background)
+        style = ttk.Style()
+        style.configure("List.TButton", background=self.CTX_SURFACE, foreground="#FFFFFF", font=("Segoe UI", 10), anchor="w", padding=5)
+        style.map("List.TButton", background=[('active', '#333333')])
+
+        # Opción Automática
         ttk.Button(scrollable_frame, text="✨ Mejor Calidad (Automático)", 
-                   command=lambda: seleccionar(None)).pack(fill='x', pady=2)
-        ttk.Separator(scrollable_frame, orient='horizontal').pack(fill='x', pady=5)
+                   command=lambda: seleccionar(None), style="List.TButton").pack(fill='x', pady=1)
 
         for _, info in ordenadas:
             tam_str = Utils.formatear_tamano(info['tamaño']) if info['tamaño'] else "~"
             btn_text = f"{info['nombre']}  -  {tam_str}"
             ttk.Button(scrollable_frame, text=btn_text, 
-                       command=lambda fid=info['formato_id']: seleccionar(fid)).pack(fill='x', pady=2)
+                       command=lambda fid=info['formato_id']: seleccionar(fid), style="List.TButton").pack(fill='x', pady=1)
 
     def iniciar_descarga_final(self, es_video, is_playlist=False):
         url = self.url_var.get().strip()
@@ -462,7 +527,7 @@ class MainWindow(tk.Tk):
     def _proceso_descarga_wrapper(self, url, directorio, es_video, is_playlist=False, indices=None):
         tipo = 'video' if es_video else 'musica'
         audio_fmt = self.audio_format_var.get()
-        video_cont = self.video_container_var.get()
+        video_cont = self.video_format_var.get() # CORREGIDO: Usar video_format_var
         
         formato_id = None
         
@@ -513,7 +578,8 @@ class MainWindow(tk.Tk):
                         progress_callback=self.update_progress, status_callback=None # Custom status above
                     )
             else:
-                self.log_status(f"Descargando {self.video_title[:20]}...")
+                title = self.video_data.get('title', 'Video')
+                self.log_status(f"Descargando {title[:20]}...")
                 self.after(0, self._limpiar_frame_dinamico)
             
                 self.youtube_service.descargar(

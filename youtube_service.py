@@ -11,17 +11,8 @@ class YouTubeService:
         self.config_manager = config_manager
 
     def _get_client_args(self, is_mp4: bool) -> dict:
-        """
-        Define la estrategia de cliente EXACTA para evitar discrepancias.
-        - MP4: Usa 'android' para evitar throttling/fragmentación.
-        - VP9/WebM: Usa 'web' (default). 'ios' causaba problemas de compatibilidad.
-        """
-        if is_mp4:
-             return {'extractor_args': {'youtube': {'player_client': ['android', 'web']}}}
-        else:
-             # Para VP9, el cliente Web por defecto es el que mejor ve los formatos 'premium' (4K/8K).
-             # No forzamos nada raro.
-             return {}
+        # Probando sin restricciones de cliente para ver si aparecen los formatos
+        return {}
 
     def obtener_info_basica(self, url: str) -> Tuple[Optional[Dict[str, Any]], str]:
         opciones = {'quiet': True, 'no_warnings': True, 'extract_flat': True}
@@ -167,52 +158,9 @@ class YouTubeService:
                     if formato.get('vcodec') == 'none' and formato.get('acodec') != 'none':
                         audio_size = formato.get('filesize', 0) or formato.get('filesize_approx', 0)
                         if audio_size > mejor_audio_size: mejor_audio_size = audio_size
-                
+                    
                 duracion = info.get('duration', 0)
-                for formato in formatos:
-                    vcodec = formato.get('vcodec', 'none')
-                    if vcodec == 'none': continue
-                    
-                    # Filtros Estrictos
-                    is_vp9 = 'vp9' in vcodec or 'vp09' in vcodec
-                    is_avc = 'avc' in vcodec or 'h264' in vcodec
-                    
-                    if video_codec == 'webm' and not is_vp9: continue
-                    if video_codec == 'mp4' and not is_avc: continue
-
-                    altura = formato.get('height', 0)
-                    if not altura or altura < 144: continue
-                    
-                    # Preferir HTTPS directo sobre m3u8 para evitar errores de archivo vacío
-                    proto = formato.get('protocol', '')
-                    if 'm3u8' in proto: 
-                        # Si tenemos alternativa directa, saltamos m3u8.
-                        # Pero si es la única opción, la guardamos con baja prioridad
-                        pass 
-
-                    video_size = formato.get('filesize', 0) or formato.get('filesize_approx', 0)
-                    tamaño_total = video_size
-                    if formato.get('acodec') == 'none' and mejor_audio_size > 0:
-                        tamaño_total += mejor_audio_size
-                    if tamaño_total == 0 and duracion > 0:
-                        tbr = formato.get('tbr', 0)
-                        if tbr > 0: tamaño_total = int((tbr * duracion * 1024) / 8)
-                    
-                    nombre_calidad = nombres_calidad.get(altura, f'{altura}p')
-                    fps = formato.get('fps', 0)
-                    if fps and fps > 30: nombre_calidad += f' {int(fps)}fps'
-                    
-                    if is_vp9: nombre_calidad += ' (VP9)'
-                    
-                    actualizar = False
-                    if altura not in calidades: actualizar = True
-                    else:
-                        info_existente = calidades[altura]
-                        # Priorizar: Mayor FPS > Mayor Tamaño > Protocolo HTTP
-                        if fps > info_existente['fps']: actualizar = True
-                        elif fps == info_existente['fps']:
-                            if tamaño_total > info_existente['tamaño']: actualizar = True
-
+                
                     if actualizar:
                         calidades[altura] = {
                             'nombre': nombre_calidad,

@@ -1,7 +1,7 @@
 from ui import MainWindow
 
 # --- INFORMACIÓN DEL PROYECTO ---
-__version__ = '3.0.0'
+__version__ = '1.3.1'
 # -------------------------------
 
 if __name__ == "__main__":
