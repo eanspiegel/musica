@@ -8,9 +8,9 @@ Hice esto porque ya me dió pereza pedirle el ytdownloader a mi pana, es tarde y
 
 python -m pip install -r requirements.txt
 
-## Notas v3.0.0
+## Notas v1.3.1
 
-- Interfaz gráfica chaval
+- Correción de calidades
 
 
 ### Instalar FFmpeg (esto es para pasarlo a mp3)
