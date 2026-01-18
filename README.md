@@ -10,10 +10,8 @@ python -m pip install -r requirements.txt
 
 ## Notas v3.0.0
 
-- **¡Nueva Interfaz Gráfica!**: Ya no se usa la terminal. Ahora tienes una ventana amigable.
-- Soporte completo para MP3, Opus, MP4 y VP9 (WebM).
-- Barra de progreso real integrada.
-- Selección de carpeta visual.
+- Interfaz gráfica chaval
+
 
 ### Instalar FFmpeg (esto es para pasarlo a mp3)
 
