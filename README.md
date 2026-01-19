@@ -3,15 +3,19 @@
 Hice esto porque ya me dió pereza pedirle el ytdownloader a mi pana, es tarde y no quiero esperar hasta el otro día
 
 - Python 3.x
-- yt-dlp
+- yt-dlp: para descargar videos de YouTube
+- mutagen: para etiquetar archivos
+- requests: para descargar portadas
+- Pillow: para editar portadas
 - FFmpeg (necesario para convertir a MP3)
 
+```bash
 python -m pip install -r requirements.txt
+```
 
-## Notas v1.3.1
+## Notas v1.4.0
 
-- Correción de calidades
-
+- Añadido etiquetado de archivos
 
 ### Instalar FFmpeg (esto es para pasarlo a mp3)
 
@@ -36,8 +40,12 @@ Te pedirá que pongas el enlace de la lista de reprodución de YT, ahí tu ves s
 
 ## Notas
 
-- Las canciones se guardan con el título del video como nombre de archivo
 - Algo que me pasó probando es que debes tener cuidado cuando copias el enlaces, aveces copias sin querer una playlist, igual el codigo te muestra cuantas canciones de van a descargar, pero pilas con eso
 
+## Notas v1.3.1
 
+- Correción de calidades
 
+## Notas v1.3.0
+
+- Interfaz gráfica

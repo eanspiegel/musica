@@ -3,12 +3,14 @@ import yt_dlp
 from typing import Optional, Tuple, Dict, Any, Callable
 from config_manager import ConfigManager
 from utils import Utils
+from metadata_service import MetadataService
 
 class YouTubeService:
     """Maneja la lógica de interacción con yt-dlp y descargas."""
     
     def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
+        self.metadata_service = MetadataService()
 
     def _get_client_args(self, is_mp4: bool) -> dict:
         # Probando sin restricciones de cliente para ver si aparecen los formatos
@@ -161,6 +163,54 @@ class YouTubeService:
                     
                 duracion = info.get('duration', 0)
                 
+                
+                for formato in formatos:
+                    vcodec = formato.get('vcodec', 'none')
+                    altura = formato.get('height', 0)
+                    ext = formato.get('ext')
+                    fid = formato.get('format_id')
+                    
+                    if vcodec == 'none': continue
+                    
+                    # Filtros Estrictos
+                    is_vp9 = 'vp9' in vcodec or 'vp09' in vcodec
+                    is_avc = 'avc' in vcodec or 'h264' in vcodec
+                    
+                    if video_codec == 'webm' and not is_vp9 and ext != 'webm': 
+                        continue
+                        
+                    if video_codec == 'mp4':
+                        if not is_avc and ext != 'mp4':
+                            continue
+                    
+                    if not altura or altura < 144: continue
+                    
+                    # Preferir HTTPS directo sobre m3u8
+                    proto = formato.get('protocol', '')
+                    if 'm3u8' in proto: pass 
+
+                    video_size = formato.get('filesize', 0) or formato.get('filesize_approx', 0)
+                    tamaño_total = video_size
+                    if formato.get('acodec') == 'none' and mejor_audio_size > 0:
+                        tamaño_total += mejor_audio_size
+                    if tamaño_total == 0 and duracion > 0:
+                        tbr = formato.get('tbr', 0)
+                        if tbr > 0: tamaño_total = int((tbr * duracion * 1024) / 8)
+                    
+                    nombre_calidad = nombres_calidad.get(altura, f'{altura}p')
+                    fps = formato.get('fps', 0)
+                    if fps and fps > 30: nombre_calidad += f' {int(fps)}fps'
+                    
+                    if is_vp9: nombre_calidad += ' (VP9)'
+                    
+                    actualizar = False
+                    if altura not in calidades: actualizar = True
+                    else:
+                        info_existente = calidades[altura]
+                        if fps > info_existente['fps']: actualizar = True
+                        elif fps == info_existente['fps']:
+                            if tamaño_total > info_existente['tamaño']: actualizar = True
+
                     if actualizar:
                         calidades[altura] = {
                             'nombre': nombre_calidad,
@@ -258,6 +308,26 @@ class YouTubeService:
 
         try:
             with yt_dlp.YoutubeDL(opciones) as ydl:
-                ydl.download([url])
+                # Usamos extract_info con download=True para obtener metadatos y asegurar descarga
+                info = ydl.extract_info(url, download=True)
+                
+                # --- ETIQUETADO DE AUDIO (SHAZAM) ---
+                if tipo == 'musica' and info:
+                    # Determinar el nombre del archivo final
+                    # yt-dlp prepare_filename da el nombre original (pre-conversion)
+                    temp_path = ydl.prepare_filename(info)
+                    base, _ = os.path.splitext(temp_path)
+                    
+                    # La extensión final depente de la conversion de ffmpeg
+                    final_ext = audio_format
+                    final_path = f"{base}.{final_ext}"
+                    
+                    # Verificar si existe (por seguridad, a veces ffmpeg no renombra igual si hay colision)
+                    if os.path.exists(final_path):
+                        if hasattr(self, 'metadata_service'):
+                             self.metadata_service.etiquetar(final_path, status_callback)
+                    else:
+                        print(f"Advertencia: No se encontró archivo final para etiquetar: {final_path}")
+
         except Exception as e:
             raise e
