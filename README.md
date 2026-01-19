@@ -16,6 +16,7 @@ python -m pip install -r requirements.txt
 
 - Correción de etiquetados en EP, canciones con el mismo nombre y diferente artista
 - Correción de la barra de progreso
+- Se agregó deezer como fuente de metadatos en el caso de que itunes no encuentre la canción
 
 ## Notas v1.4.0
 

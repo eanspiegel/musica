@@ -604,45 +604,16 @@ class MainWindow(tk.Tk):
                 # Mostrar estado grande
                 def show_status_big():
                     ttk.Label(self.dynamic_frame, text="🎵 Descargando Playlist...", font=("Segoe UI", 16, "bold")).pack(expand=True)
-                    ttk.Label(self.dynamic_frame, text="Por favor espera, procesando videos...", font=("Segoe UI", 10)).pack(pady=(0, 20))
+                    ttk.Label(self.dynamic_frame, text="Por favor espera, procesando y analizando consistencia...", font=("Segoe UI", 10)).pack(pady=(0, 20))
                 self.after(100, show_status_big)
 
-                # ITERACIÓN MANUAL 
-                total = len(indices)
-                for i, item in enumerate(indices):
-                    target_url = item.get('url')
-                    target_title = item.get('title', f"Video {i+1}")
-                    
-                    if not target_url: continue
-                    
-                    self.log_status(f"Descargando ({i+1}/{total}): {target_title[:30]}...")
-                    
-                    # Wrapper para progreso global de la playlist
-                    def playlist_progress(val):
-                        # val es el % del video actual (0-100)
-                        # Contribución de este video al total: 100 / total
-                        step = 100 / total
-                        # Progreso base (videos anteriores)
-                        base = i * step
-                        # Progreso actual
-                        global_progress = base + (val * step / 100)
-                        self.update_progress(global_progress)
-
-                    try:
-                        # Llamamos a descargar como video individual
-                        # Force type 'video' or 'musica' but WITHOUT playlist indices
-                        self.youtube_service.descargar(
-                            url=target_url, tipo=tipo, formato_id=None, # Auto quality for playlist items 
-                            audio_format=audio_fmt, directorio=directorio, contenedor=video_cont,
-                            progress_callback=playlist_progress, status_callback=None # Custom status above
-                        )
-                    except Exception as e:
-                        print(f"❌ Error descargando '{target_title}': {e}")
-                        self.log_status(f"⚠️ Saltando: {target_title[:20]}...")
-                        # Opcional: sleep breve para que el usuario lea
-                        import time
-                        time.sleep(1)
-                        continue
+                # DELEGAMOS TODO EL BATCH AL SERVICIO:
+                self.youtube_service.descargar(
+                    url=url, tipo=tipo, formato_id=None, # Auto quality for playlist items 
+                    audio_format=audio_fmt, directorio=directorio, contenedor=video_cont,
+                    progress_callback=self.update_progress, status_callback=self.log_status,
+                    indices=indices # Pasamos la lista para activar modo Batch
+                )
             else:
                 title = self.video_data.get('title', 'Video')
                 self.log_status(f"Descargando {title[:20]}...")

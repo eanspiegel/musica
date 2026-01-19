@@ -226,41 +226,112 @@ class YouTubeService:
 
     def descargar(self, url: str, tipo: str, formato_id: str = None, audio_format: str = 'mp3', directorio: str = '', 
                   contenedor: str = 'mp4', progress_callback: Callable = None, status_callback: Callable = None, indices: Optional[list] = None) -> None:
-        if not os.path.exists(directorio):
-            os.makedirs(directorio)
+        
+        if indices:
+            # Modo Batch (Playlist Manual)
+            self.descargar_playlist_batch(url, indices, tipo, formato_id, audio_format, directorio, contenedor, progress_callback, status_callback)
+        else:
+            # Modo Single (O playlist completa auto gestionada por yt-dlp, pero tratada como single url)
+            self._descargar_single(url, tipo, formato_id, audio_format, directorio, contenedor, progress_callback, status_callback)
+
+    def descargar_playlist_batch(self, url_base: str, items: list, tipo: str, formato_id: str, audio_format: str, directorio: str, 
+                                 contenedor: str, progress_callback: Callable, status_callback: Callable):
+        
+        if not os.path.exists(directorio): os.makedirs(directorio)
+
+        tagging_results = [] # Para el analisis de consenso final
+        
+        total = len(items)
+        for i, item in enumerate(items):
+            target_url = item.get('url')
+            target_title = item.get('title', f"Video {i+1}")
+            
+            if not target_url: continue
+            
+            # Wrapper para progreso relativo
+            def local_progress(val):
+                step = 100 / total
+                base = i * step
+                global_progress = base + (val * step / 100)
+                if progress_callback: progress_callback(global_progress)
+
+            try:
+                # Descargamos individualmente
+                # NOTA: _descargar_single retorna el resultado de etiquetado si hubo musica
+                res = self._descargar_single(target_url, tipo, formato_id, audio_format, directorio, contenedor, local_progress, status_callback)
+                
+                if res and isinstance(res, dict) and 'artist' in res:
+                    res['original_entry'] = item # Guardamos info original para correcciones futuras
+                    tagging_results.append(res)
+                    
+            except Exception as e:
+                print(f"❌ Error descargando item batch '{target_title}': {e}")
+                if status_callback: status_callback(f"⚠️ Error en {target_title[:15]}...")
+
+        # --- ANÁLISIS RETROSPECTIVO (Consistencia de Playlist) ---
+        if tipo == 'musica' and len(tagging_results) > 1:
+             print(f"📊 Analizando consistencia de playlist ({len(tagging_results)} procesadas)...")
+             
+             from collections import Counter
+             found_artists = [res['artist'] for res in tagging_results if res.get('artist') and res['artist'] != "Desconocido"]
+             
+             if found_artists:
+                 most_common_found = Counter(found_artists).most_common(1)
+                 if most_common_found:
+                     dominant_artist = most_common_found[0][0]
+                     count = most_common_found[0][1]
+                     total_tags = len(tagging_results)
+                     
+                     # 60% Consenso
+                     if count >= total_tags * 0.6: 
+                         print(f"⚖️ Consenso de Playlist detectado: '{dominant_artist}' ({count}/{total_tags})")
+                         
+                         for res in tagging_results:
+                             current_artist = res.get('artist')
+                             is_imposter = False
+                             if current_artist and current_artist != dominant_artist:
+                                 # Validar que no contenga al dominante (ej: Feat)
+                                 if dominant_artist.lower() not in current_artist.lower():
+                                     is_imposter = True
+                             
+                             if is_imposter:
+                                 print(f"🕵️ 'Impostor' detectado: '{current_artist}' en '{os.path.basename(res['file_path'])}'. Corrigiendo con '{dominant_artist}'...")
+                                 if status_callback: status_callback(f"🔄 Corrigiendo: {dominant_artist}")
+                                 
+                                 # FORZAR ETIQUETADO con el artista dominante
+                                 # Usamos strict_artist_match=True para evitar que la estrategia backup
+                                 # nos devuelva el mismo resultado incorrecto (ej: Hello Clairo -> Hello -> Adele)
+                                 # Usamos search_title para buscar con el titulo original (ej: "Hello?") en vez del sanetizado ("Hello")
+                                 orig_title = res.get('original_entry', {}).get('title')
+                                 self.metadata_service.etiquetar(res['file_path'], artista_hint=dominant_artist, status_callback=None, strict_artist_match=True, search_title=orig_title)
+
+    def _descargar_single(self, url: str, tipo: str, formato_id: str, audio_format: str, directorio: str, 
+                          contenedor: str, progress_callback: Callable, status_callback: Callable):
+        
+        if not os.path.exists(directorio): os.makedirs(directorio)
 
         def hook(d):
             if d['status'] == 'downloading':
                 try:
                     p = 0.0
-                    # Robusta extracción de porcentaje con Regex
                     p_str = d.get('_percent_str', '')
-                    # Buscar patrón de número (ej: 12.5, 100.0)
                     import re
                     match = re.search(r"(\d+(\.\d+)?)", p_str)
-                    
                     if match:
                         p = float(match.group(1))
                     else:
-                        # Fallback: Calculo manual
                         downloaded = d.get('downloaded_bytes', 0)
                         total = d.get('total_bytes') or d.get('total_bytes_estimate')
-                        if total:
-                            p = (downloaded / total) * 100.0
+                        if total: p = (downloaded / total) * 100.0
                             
-                    if progress_callback:
-                        progress_callback(p)
-                        
+                    if progress_callback: progress_callback(p)
                     if status_callback:
                         eta = d.get('_eta_str', '?')
-                        status_callback(f"Descargando: {p:.1f}% - {eta} restantes")
-                except Exception as e:
-                    print(f"Error en hook de progreso: {e}")
-                    pass
+                        status_callback(f"Descargando: {p:.1f}% - {eta}")
+                except: pass
             elif d['status'] == 'finished':
-                if status_callback:
-                    status_callback("Procesando / Convirtiendo...")
-                    if progress_callback: progress_callback(100)
+                if status_callback: status_callback("Procesando / Convirtiendo...")
+                if progress_callback: progress_callback(100)
 
         opciones = {
             'outtmpl': os.path.join(directorio, '%(title)s.%(ext)s'),
@@ -271,24 +342,7 @@ class YouTubeService:
             'progress_hooks': [hook],
         }
 
-        # Filtrado de Playlist (Indices 1-based)
-        if indices:
-            opciones['playlist_items'] = ",".join(map(str, indices))
-            
-            # CRITICAL FIX: Si es una URL mixta (watch?v=...&list=...), yt-dlp puede ignorar
-            # playlist_items y bajar solo el video. Forzamos formato playlist puro.
-            if 'list=' in url:
-                try:
-                    from urllib.parse import urlparse, parse_qs
-                    parsed = urlparse(url)
-                    qs = parse_qs(parsed.query)
-                    if 'list' in qs:
-                        playlist_id = qs['list'][0]
-                        url = f"https://www.youtube.com/playlist?list={playlist_id}"
-                except Exception as e:
-                    pass # Si falla, usamos la original
-        
-        # 1. Aplicamos la MISMA estrategia de cliente
+        # Configurar cliente
         es_mp4 = (tipo == 'video' and contenedor == 'mp4')
         opciones.update(self._get_client_args(es_mp4))
         
@@ -305,122 +359,39 @@ class YouTubeService:
         
         elif tipo == 'video':
             if formato_id:
-                # STRICT FIX v3 (ID Exacto):
-                # Usamos el ID que encontramos en 'obtener_calidades__disponibles'.
-                # Como usamos el MISMO cliente, el ID debe existir.
                 opciones['format'] = f"{formato_id}+bestaudio/best"
-                # Nota: /best es fallback solo para el audio, no para el video.
             else:
-                # Automático
                 if contenedor == 'webm':
                     opciones['format'] = 'bestvideo[vcodec*=vp9]+bestaudio/best'
                 else:
                     opciones['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
             
             if ffmpeg_ok:
-                # Merge container
-                if contenedor == 'webm':
-                    opciones['merge_output_format'] = 'webm'
-                else:
-                    opciones['merge_output_format'] = 'mp4'
+                if contenedor == 'webm': opciones['merge_output_format'] = 'webm'
+                else: opciones['merge_output_format'] = 'mp4'
 
-        try:
-            with yt_dlp.YoutubeDL(opciones) as ydl:
-                # Usamos extract_info con download=True para obtener metadatos y asegurar descarga
-                info = ydl.extract_info(url, download=True)
+        tag_result = None
+        
+        with yt_dlp.YoutubeDL(opciones) as ydl:
+            # Descarga real
+            info = ydl.extract_info(url, download=True)
+            
+            # --- ETIQUETADO DE AUDIO ---
+            if tipo == 'musica' and info:
+                # Determinar path final
+                temp_path = ydl.prepare_filename(info)
+                base, _ = os.path.splitext(temp_path)
+                final_path = f"{base}.{audio_format}"
                 
-                # --- ETIQUETADO DE AUDIO (POST-PROCESAMIENTO) ---
-                if tipo == 'musica' and info:
-                    def get_artist_from_entry(entry):
-                        return entry.get('artist') or entry.get('uploader') or entry.get('channel')
+                if os.path.exists(final_path):
+                     # Intentamos obtener hint del single video
+                     artist_hint = info.get('uploader') or info.get('artist') or info.get('channel')
+                     
+                     if hasattr(self, 'metadata_service'):
+                         tag_result = self.metadata_service.etiquetar(final_path, artista_hint=artist_hint, status_callback=status_callback)
+                else:
+                    print(f"⚠️ Archivo final no hallado para etiquetas: {final_path}")
 
-                    entries_to_process = []
-                    
-                    # Detectar si es Playlist o Video único
-                    if 'entries' in info:
-                        # Es Playlist: Recopilar entradas válidas
-                        entries_to_process = [e for e in info['entries'] if e]
-                    else:
-                        # Es Video único
-                        entries_to_process = [info]
+        return tag_result
 
-                    # --- LÓGICA DE ARTISTA COMÚN (Consenso) ---
-                    common_artist_hint = None
-                    if len(entries_to_process) > 1:
-                        from collections import Counter
-                        artists = []
-                        for e in entries_to_process:
-                            a = get_artist_from_entry(e)
-                            if a: artists.append(a)
-                        
-                        if artists:
-                            # Obtener el más común
-                            most_common = Counter(artists).most_common(1)
-                            if most_common:
-                                common_artist_hint = most_common[0][0]
-                                print(f"🎨 Artista detectado del Playlist (Consenso): {common_artist_hint}")
 
-                    # --- BUCLE DE ETIQUETADO INICIAL ---
-                    tagging_results = [] # Lista de dicts con {artist, file_path, original_entry}
-                    
-                    for entry in entries_to_process:
-                        try:
-                            # 1. Determinar Hint (Individual vs Consenso)
-                            artist_hint = common_artist_hint if common_artist_hint else get_artist_from_entry(entry)
-
-                            # 2. Calcular Ruta del Archivo
-                            temp_path = ydl.prepare_filename(entry)
-                            base, _ = os.path.splitext(temp_path)
-                            final_ext = audio_format
-                            final_path = f"{base}.{final_ext}"
-
-                            # Verificar existencia
-                            if os.path.exists(final_path):
-                                if hasattr(self, 'metadata_service'):
-                                     result = self.metadata_service.etiquetar(final_path, artista_hint=artist_hint, status_callback=status_callback)
-                                     if result:
-                                         result['original_entry'] = entry # Guardar ref para re-search
-                                         tagging_results.append(result)
-                            else:
-                                print(f"⚠️ Archivo no encontrado para etiquetar: {final_path}")
-
-                        except Exception as e_inner:
-                            print(f"Error etiquetando entry {entry.get('title')}: {e_inner}")
-
-                    # --- ANÁLISIS RETROSPECTIVO (Consistencia de Playlist) ---
-                    # Si es un playlist y tenemos resultados, verificamos si hay "impostores"
-                    if len(tagging_results) > 1 and common_artist_hint:
-                         # Calcular artista dominante en los RESULTADOS (no en youtube info)
-                         from collections import Counter
-                         
-                         found_artists = [res['artist'] for res in tagging_results if res.get('artist') and res['artist'] != "Desconocido"]
-                         if found_artists:
-                             most_common_found = Counter(found_artists).most_common(1)
-                             if most_common_found:
-                                 dominant_artist = most_common_found[0][0]
-                                 count = most_common_found[0][1]
-                                 total = len(tagging_results)
-                                 
-                                 # Si la mayoría coincide (ej: 4/5), imponemos orden a los disidentes
-                                 if count >= total * 0.6: # 60% concenso
-                                     print(f"⚖️ Consenso de Playlist detectado: '{dominant_artist}' ({count}/{total})")
-                                     
-                                     for res in tagging_results:
-                                         current_artist = res.get('artist')
-                                         # Si el artista es diferente (y no es vacio), es sospechoso
-                                         if current_artist and current_artist != dominant_artist:
-                                             print(f"🕵️ 'Impostor' detectado: '{current_artist}' en archivo '{os.path.basename(res['file_path'])}'. Reintentando con '{dominant_artist}'...")
-                                             
-                                             if status_callback: status_callback(f"🔄 Corrigiendo: {dominant_artist}")
-                                             
-                                             # FORZAR ETIQUETADO con el artista dominante
-                                             # Usamos el titulo limpio original vs el dominante
-                                             # MetadataService ya tiene logica para 'clean_query + hint'
-                                             # Simplemente llamamos de nuevo pasando dominant_artist como hint
-                                             self.metadata_service.etiquetar(res['file_path'], artista_hint=dominant_artist, status_callback=status_callback)
-
-        except Exception as e:
-            raise e
-
-        except Exception as e:
-            raise e
