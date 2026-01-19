@@ -12,6 +12,10 @@ Hice esto porque ya me dió pereza pedirle el ytdownloader a mi pana, es tarde y
 ```bash
 python -m pip install -r requirements.txt
 ```
+## Notas v1.4.1
+
+- Correción de etiquetados en EP, canciones con el mismo nombre y diferente artista
+- Correción de la barra de progreso
 
 ## Notas v1.4.0
 

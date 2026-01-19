@@ -73,6 +73,14 @@ class MainWindow(tk.Tk):
         # Scrollbar (Dark ish)
         style.configure("Vertical.TScrollbar", background="#333333", troughcolor=self.CTX_BG, borderwidth=0, arrowcolor="#FFFFFF")
 
+        # Progress Bar (Green)
+        style.configure("Horizontal.TProgressbar", 
+                        troughcolor="#333333", 
+                        background=self.CTX_ACCENT, 
+                        bordercolor=self.CTX_BG, 
+                        lightcolor=self.CTX_ACCENT, 
+                        darkcolor=self.CTX_ACCENT)
+
         self.resizable(True, True)
         
         self.video_data = None 
@@ -82,26 +90,53 @@ class MainWindow(tk.Tk):
         self._init_ui()
         
     def _on_mousewheel(self, event):
-        if hasattr(self, 'playlist_canvas'):
-            self.playlist_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        # Scroll Main Canvas
+        if hasattr(self, 'main_canvas'):
+            self.main_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
     def _init_ui(self):
+        # --- MAIN SCROLL FRAME SETUP ---
+        # Container principal
+        main_container = ttk.Frame(self)
+        main_container.pack(fill=tk.BOTH, expand=True)
+        
+        self.main_canvas = tk.Canvas(main_container, background=self.CTX_BG, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(main_container, orient="vertical", command=self.main_canvas.yview, style="Vertical.TScrollbar")
+        
+        # Frame interno donde van los widgets real
+        self.content_frame = ttk.Frame(self.main_canvas, style="TFrame")
+        
+        # Configurar región de scroll
+        self.content_frame.bind("<Configure>", lambda e: self.main_canvas.configure(scrollregion=self.main_canvas.bbox("all")))
+        
+        # Crear la ventana dentro del canvas
+        self.canvas_window = self.main_canvas.create_window((0, 0), window=self.content_frame, anchor="nw")
+        
+        self.main_canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack canvas y scrollbar
+        self.main_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Auto-ajustar ancho del content_frame al tamaño del canvas
+        self.main_canvas.bind("<Configure>", lambda e: self.main_canvas.itemconfig(self.canvas_window, width=e.width))
+
+        # --- WIDGETS (Parent: self.content_frame) ---
+        
         # Header
-        header_frame = ttk.Frame(self)
+        header_frame = ttk.Frame(self.content_frame)
         header_frame.pack(fill=tk.X, pady=(20, 10), padx=20)
         
         lbl_header = ttk.Label(header_frame, text="Descargador de YouTube 🎬", font=("Segoe UI", 18, "bold"))
-        lbl_header.pack() # Centered by default
+        lbl_header.pack()
 
         # Input Frame
-        input_frame = ttk.Labelframe(self, text="1. Ingresa el Link", padding=15)
+        input_frame = ttk.Labelframe(self.content_frame, text="1. Ingresa el Link", padding=15)
         input_frame.pack(fill=tk.X, padx=20, pady=10)
         
         self.url_var = tk.StringVar()
         self.entry_url = ttk.Entry(input_frame, textvariable=self.url_var, font=("Segoe UI", 11))
         self.entry_url.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        self.entry_url.focus()
-        
         self.entry_url.focus()
         
         self.btn_analizar = ttk.Button(input_frame, text="🔍 ANALIZAR", command=self._on_analizar_click, style="Accent.TButton", width=15)
@@ -111,12 +146,12 @@ class MainWindow(tk.Tk):
         self.audio_format_var = tk.StringVar(value="mp3")
         self.video_format_var = tk.StringVar(value="mp4")
 
-        # Dynamic Content Area (Scrollable if needed, but we use a big frame)
-        self.dynamic_frame = ttk.Frame(self)
+        # Dynamic Content Area (Ahora dentro del scroll)
+        self.dynamic_frame = ttk.Frame(self.content_frame)
         self.dynamic_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-        # --- DIRECTORIO (Ahora fijo en init) ---
-        dir_frame = ttk.Frame(self, padding="0 10 0 0")
+        # --- DIRECTORIO ---
+        dir_frame = ttk.Frame(self.content_frame, padding="0 10 0 0")
         dir_frame.pack(fill=tk.X, pady=10, padx=20)
         
         self.dir_var = tk.StringVar(value=self.config_manager.cargar_configuracion() or "No seleccionado")
@@ -126,11 +161,14 @@ class MainWindow(tk.Tk):
 
         # --- PROGRESO ---
         self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(self, variable=self.progress_var, maximum=100)
+        self.progress_bar = ttk.Progressbar(self.content_frame, variable=self.progress_var, maximum=100, style="Horizontal.TProgressbar")
         self.progress_bar.pack(fill=tk.X, pady=(10, 5), padx=20)
         
         self.status_var = tk.StringVar(value="Esperando enlace...")
-        ttk.Label(self, textvariable=self.status_var, font=("Segoe UI", 9), foreground="#666").pack(anchor="w", padx=20)
+        ttk.Label(self.content_frame, textvariable=self.status_var, font=("Segoe UI", 9), foreground="#666").pack(anchor="w", padx=20, pady=(0, 20))
+        
+        # Bind Global Mousewheel (Al Canvas Principal)
+        self.bind_all("<MouseWheel>", self._on_mousewheel)
         
     def _on_analizar_click(self):
         url = self.url_var.get().strip()
@@ -560,6 +598,15 @@ class MainWindow(tk.Tk):
                     return
 
             if is_playlist and indices:
+                # Limpiar UI anterior para que no estorbe
+                self.after(0, self._limpiar_frame_dinamico)
+                
+                # Mostrar estado grande
+                def show_status_big():
+                    ttk.Label(self.dynamic_frame, text="🎵 Descargando Playlist...", font=("Segoe UI", 16, "bold")).pack(expand=True)
+                    ttk.Label(self.dynamic_frame, text="Por favor espera, procesando videos...", font=("Segoe UI", 10)).pack(pady=(0, 20))
+                self.after(100, show_status_big)
+
                 # ITERACIÓN MANUAL 
                 total = len(indices)
                 for i, item in enumerate(indices):
@@ -570,13 +617,32 @@ class MainWindow(tk.Tk):
                     
                     self.log_status(f"Descargando ({i+1}/{total}): {target_title[:30]}...")
                     
-                    # Llamamos a descargar como video individual
-                    # Force type 'video' or 'musica' but WITHOUT playlist indices
-                    self.youtube_service.descargar(
-                        url=target_url, tipo=tipo, formato_id=None, # Auto quality for playlist items 
-                        audio_format=audio_fmt, directorio=directorio, contenedor=video_cont,
-                        progress_callback=self.update_progress, status_callback=None # Custom status above
-                    )
+                    # Wrapper para progreso global de la playlist
+                    def playlist_progress(val):
+                        # val es el % del video actual (0-100)
+                        # Contribución de este video al total: 100 / total
+                        step = 100 / total
+                        # Progreso base (videos anteriores)
+                        base = i * step
+                        # Progreso actual
+                        global_progress = base + (val * step / 100)
+                        self.update_progress(global_progress)
+
+                    try:
+                        # Llamamos a descargar como video individual
+                        # Force type 'video' or 'musica' but WITHOUT playlist indices
+                        self.youtube_service.descargar(
+                            url=target_url, tipo=tipo, formato_id=None, # Auto quality for playlist items 
+                            audio_format=audio_fmt, directorio=directorio, contenedor=video_cont,
+                            progress_callback=playlist_progress, status_callback=None # Custom status above
+                        )
+                    except Exception as e:
+                        print(f"❌ Error descargando '{target_title}': {e}")
+                        self.log_status(f"⚠️ Saltando: {target_title[:20]}...")
+                        # Opcional: sleep breve para que el usuario lea
+                        import time
+                        time.sleep(1)
+                        continue
             else:
                 title = self.video_data.get('title', 'Video')
                 self.log_status(f"Descargando {title[:20]}...")
@@ -590,9 +656,9 @@ class MainWindow(tk.Tk):
                 )
             
             self.log_status("✓ ¡Listo! Guardado.")
+            self.progress_var.set(100) # Barra llena al finalizar
             messagebox.showinfo("Completado", "¡Descarga finalizada!")
             self.url_var.set("")
-            self.progress_var.set(0)
             self.after(0, lambda: self._limpiar_frame_dinamico)
             
         except Exception as e:
@@ -601,5 +667,6 @@ class MainWindow(tk.Tk):
             err_msg = re.sub(r'\x1b\[[0-9;]*m', '', str(e))
             messagebox.showerror("Error", f"Falló:\n{err_msg}")
             self.after(0, lambda: self._mostrar_opciones_principales)
+            self.progress_var.set(0) # Reset solo en error
         finally:
             self.btn_analizar.config(state="normal")
