@@ -3,7 +3,7 @@ playlist/
 Thumbs.db
 config.json
 
-
+.venv/
 __pycache__/
 *.pyc
 

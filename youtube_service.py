@@ -13,24 +13,66 @@ class YouTubeService:
         self.metadata_service = MetadataService()
 
     def _get_client_args(self, is_mp4: bool) -> dict:
-        # Probando sin restricciones de cliente para ver si aparecen los formatos
-        return {}
+        # Usar cliente Android para evitar 403s comunes en PC
+        return {
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web']
+                }
+            }
+        }
+
+    def _clean_url(self, url: str) -> str:
+        """
+        Limpia la URL para evitar descargar Mixes/Radios accidentales.
+        Si es Mix (RD...) mantiene solo el video.
+        Si es Playlist real, intenta normalizarla.
+        """
+        try:
+            # 1. Si es un Mix (list=RD...) y tiene video (v=...), priorizar el video y quitar la lista.
+            if 'list=' in url and 'v=' in url:
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(url)
+                qs = parse_qs(parsed.query)
+                if 'v' in qs and 'list' in qs:
+                    list_id = qs['list'][0]
+                    # RD = Mix/Radio. start_radio = Contexto radio.
+                    if list_id.startswith('RD') or 'start_radio' in qs:
+                            video_id = qs['v'][0]
+                            clean = f"https://www.youtube.com/watch?v={video_id}"
+                            print(f"🧹 Link limpiado de Mix/Radio: {clean}")
+                            return clean
+
+            # 2. Si NO se limpió (no era Mix) y sigue teniendo list=, forzamos modo Playlist
+            # (Este era el comportamiento original, útil para URLs de playlists pegadas)
+            # Solo si NO tiene video ID (o si el usuario explícitamente pegó una playlist)
+            # PERO si tiene v= y list= (y no es RD), yt-dlp prioriza list si no limpiamos.
+            # Decision: Si el servicio lo llama para "single", debería ser single. 
+            pass 
+        except:
+            pass
+        return url
 
     def obtener_info_basica(self, url: str) -> Tuple[Optional[Dict[str, Any]], str]:
         opciones = {'quiet': True, 'no_warnings': True, 'extract_flat': True}
         try:
             # Priorizar Playlist: Si el link tiene &list=, lo transformamos a link de playlist puro
-            url_limpia = url
-            if 'list=' in url:
-                try:
+            # Limpieza centralizada
+            url_limpia = self._clean_url(url)
+            
+            # Si limpiamos la URL (era mix), url_limpia será watch?v=...
+            # Si no (era playlist real o video solo), sigue igual.
+            
+            # Normalizacion extra para Playlists puras (si el usuario pegó una playlist real sucia)
+            if 'list=' in url_limpia and 'v=' not in url_limpia:
+                 try:
                     from urllib.parse import urlparse, parse_qs
-                    parsed = urlparse(url)
+                    parsed = urlparse(url_limpia)
                     qs = parse_qs(parsed.query)
                     if 'list' in qs:
                         playlist_id = qs['list'][0]
                         url_limpia = f"https://www.youtube.com/playlist?list={playlist_id}"
-                except:
-                    pass
+                 except: pass
 
             # Usamos la URL limpia para la extracción
             with yt_dlp.YoutubeDL(opciones) as ydl:
@@ -143,6 +185,9 @@ class YouTubeService:
         es_mp4 = (video_codec == 'mp4')
         opciones = {'quiet': True, 'no_warnings': True}
         opciones.update(self._get_client_args(es_mp4))
+        
+        # Limpieza tambien aqui por seguridad
+        url = self._clean_url(url)
 
         try:
             with yt_dlp.YoutubeDL(opciones) as ydl:
@@ -227,6 +272,9 @@ class YouTubeService:
     def descargar(self, url: str, tipo: str, formato_id: str = None, audio_format: str = 'mp3', directorio: str = '', 
                   contenedor: str = 'mp4', progress_callback: Callable = None, status_callback: Callable = None, indices: Optional[list] = None) -> None:
         
+        # LIMPIEZA CRÍTICA: Asegurar que descargamos lo que analizamos
+        url = self._clean_url(url) # <--- FIX AQUI
+
         if indices:
             # Modo Batch (Playlist Manual)
             self.descargar_playlist_batch(url, indices, tipo, formato_id, audio_format, directorio, contenedor, progress_callback, status_callback)
