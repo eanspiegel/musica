@@ -110,7 +110,7 @@ class AppController:
                     
                     # 1. Download
                     res, info = self.youtube_service.descargar(
-                        url, tipo, formato_id, audio_format, path, video_fmt,
+                        url, tipo, formato_id, audio_fmt, path, video_fmt,
                         progress_callback, status_callback
                     )
                     

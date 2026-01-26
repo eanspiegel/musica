@@ -299,11 +299,14 @@ class YouTubeService:
         if tipo == 'musica':
             opciones['format'] = 'bestaudio/best'
             if ffmpeg_ok:
-                opciones['postprocessors'] = [{
+                pp_args = {
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': audio_format,
-                    'preferredquality': '192',
-                }]
+                }
+                if audio_format == 'mp3':
+                    pp_args['preferredquality'] = '320'
+                
+                opciones['postprocessors'] = [pp_args]
         
         elif tipo == 'video':
             if formato_id:
