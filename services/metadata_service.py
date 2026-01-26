@@ -17,10 +17,10 @@ except ImportError:
 
 
 class MetadataService:
-    """Servicio para etiquetar archivos de audio usando iTunes."""
+    """Servicio para etiquetar archivos de audio usando Shazam, iTunes, Deezer y LRCLIB."""
     
     def __init__(self):
-        pass # No requiere inicialización de servicios externos
+        pass 
         
     async def _buscar_shazam(self, ruta_archivo: str, status_callback=None):
         if not HAS_SHAZAM:
@@ -42,7 +42,6 @@ class MetadataService:
             # Metadata extra
             album = None
             genero = None
-            track_number = None
             imagen_url = None
             anio = None
             letra = None
@@ -317,27 +316,20 @@ class MetadataService:
              if status_callback: status_callback("⚠️ Sin metadatos")
 
         # --- FALLBACK FINAL LETRA (LRCLIB) ---
-        # print("DEBUG: Verificando fallback de letra...")
         try:
             if not letra and (datos_encontrados or titulo):
                  safe_titulo = titulo if titulo else titulo_busqueda
                  safe_artista = artista if artista else (artista_hint or "")
                  
-                 # print(f"DEBUG: Check LRCLIB -> Letra: {letra is not None}, Datos: {datos_encontrados}, Título: {safe_titulo}, Artista: {safe_artista}")
-                 
                  if safe_titulo and safe_artista and safe_artista != "Desconocido":
-                     # print("DEBUG: Llamando a _buscar_letra_lrclib...")
                      letra = await self._buscar_letra_lrclib(safe_titulo, safe_artista, album, None)
-                     # print(f"DEBUG: Retorno LRCLIB -> Letra encontrada: {letra is not None}")
         except Exception as e:
             print(f"❌ Error en bloque fallback LRCLIB: {e}")
 
-        # print("DEBUG: Preparando guardado de archivo...")
         try:
             _, ext = os.path.splitext(ruta_archivo)
             ext = ext.lower()
             
-            # print(f"DEBUG: Archivo {ext}, Guardando...")
             if letra: print(f"📝 Escribiendo letra ({len(letra)} bytes)...")
 
             if ext == '.mp3':
@@ -345,8 +337,6 @@ class MetadataService:
             elif ext == '.opus':
                 self._guardar_opus(ruta_archivo, titulo, artista, album, genero, track_number, disc_number, disc_count, imagen_url, anio, letra)
             
-            # print("DEBUG: Guardado finalizado (o intentado).")
-                
             if datos_encontrados and titulo and titulo != "Desconocido":
                 directorio = os.path.dirname(ruta_archivo)
                 nombre_limpio = re.sub(r'[<>:"/\\|?*]', '', titulo).strip()

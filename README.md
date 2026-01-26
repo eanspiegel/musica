@@ -2,7 +2,7 @@
 
 Hice esto porque ya me dió pereza pedirle el ytdownloader a mi pana, es tarde y no quiero esperar hasta el otro día
 
-- Python 3.x
+- Python 3.12.10
 - yt-dlp: para descargar videos de YouTube
 - mutagen: para etiquetar archivos
 - requests: para descargar portadas
@@ -11,7 +11,13 @@ Hice esto porque ya me dió pereza pedirle el ytdownloader a mi pana, es tarde y
 
 ```bash
 python -m pip install -r requirements.txt
+
 ```
+
+## Notas v1.5.0
+
+-Refactorización y ahora usa Shazam para obtener los metadatos
+
 ## Notas v1.4.1
 
 - Correción de etiquetados en EP, canciones con el mismo nombre y diferente artista

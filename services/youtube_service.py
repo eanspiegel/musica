@@ -2,18 +2,16 @@ import os
 import yt_dlp
 from typing import Optional, Tuple, Dict, Any, Callable
 from config_manager import ConfigManager
-from utils import Utils
-from metadata_service import MetadataService
+from utils.utils import Utils
 
 class YouTubeService:
-    """Maneja la lógica de interacción con yt-dlp y descargas."""
+    """Maneja SOLO la lógica de interacción con yt-dlp y descargas."""
     
     def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
-        self.metadata_service = MetadataService()
+        # Eliminada dependencia de MetadataService
 
     def _get_client_args(self, is_mp4: bool) -> dict:
-        # Usar cliente Android para evitar 403s comunes en PC
         return {
             'extractor_args': {
                 'youtube': {
@@ -23,35 +21,25 @@ class YouTubeService:
         }
 
     def _clean_url(self, url: str) -> str:
-        """
-        Limpia la URL para evitar descargar Mixes/Radios accidentales.
-        Si es Mix (RD...) mantiene solo el video.
-        Si es Playlist real, intenta normalizarla.
-        """
         try:
-            # 1. Si es un Mix (list=RD...) y tiene video (v=...), priorizar el video y quitar la lista.
             if 'list=' in url and 'v=' in url:
                 from urllib.parse import urlparse, parse_qs
                 parsed = urlparse(url)
                 qs = parse_qs(parsed.query)
                 if 'v' in qs and 'list' in qs:
                     list_id = qs['list'][0]
-                    # RD = Mix/Radio. start_radio = Contexto radio.
                     if list_id.startswith('RD') or 'start_radio' in qs:
                             video_id = qs['v'][0]
                             clean = f"https://www.youtube.com/watch?v={video_id}"
                             print(f"🧹 Link limpiado de Mix/Radio: {clean}")
                             return clean
 
-            # 2. Si NO se limpió (no era Mix) y sigue teniendo list=, forzamos modo Playlist
             if 'list=' in url and 'v=' in url:
-                # Re-parsear por si acaso (o reusar logic anterior si refactorizas)
                 from urllib.parse import urlparse, parse_qs
                 parsed = urlparse(url)
                 qs = parse_qs(parsed.query)
                 if 'list' in qs:
                     list_id = qs['list'][0]
-                    # Si NO es Mix (ya filtrado arriba o validado aqui)
                     if not list_id.startswith('RD'):
                          clean = f"https://www.youtube.com/playlist?list={list_id}"
                          print(f"📂 Link convertido a Playlist pura: {clean}")
@@ -62,17 +50,10 @@ class YouTubeService:
 
     def obtener_info_basica(self, url: str) -> Tuple[Optional[Dict[str, Any]], str]:
         opciones = {'quiet': True, 'no_warnings': True, 'extract_flat': True}
-        # options.update(self._get_client_args(is_mp4=False)) # REVERTIDO: Provoca que las playlists no se detecten bien en UI
 
         try:
-            # Priorizar Playlist: Si el link tiene &list=, lo transformamos a link de playlist puro
-            # Limpieza centralizada
             url_limpia = self._clean_url(url)
             
-            # Si limpiamos la URL (era mix), url_limpia será watch?v=...
-            # Si no (era playlist real o video solo), sigue igual.
-            
-            # Normalizacion extra para Playlists puras (si el usuario pegó una playlist real sucia)
             if 'list=' in url_limpia and 'v=' not in url_limpia:
                  try:
                     from urllib.parse import urlparse, parse_qs
@@ -83,16 +64,13 @@ class YouTubeService:
                         url_limpia = f"https://www.youtube.com/playlist?list={playlist_id}"
                  except: pass
 
-            # Usamos la URL limpia para la extracción
             with yt_dlp.YoutubeDL(opciones) as ydl:
                 info = ydl.extract_info(url_limpia, download=False)
                 
-                # Debugging
                 _type = info.get('_type', 'video')
                 has_entries = 'entries' in info
                 print(f"🕵️ Extraction Info: Type={_type}, HasEntries={has_entries}, Title={info.get('title')}")
 
-                # Procesar duración y Tipo
                 es_playlist = _type == 'playlist' or has_entries
                 
                 if es_playlist:
@@ -101,18 +79,13 @@ class YouTubeService:
                      count = len(entries)
                      dur_str = f"{count} Videos"
                      
-                     # Intentar obtener thumbnail de la playlist o del primer video
-                     # Intentar obtener thumbnail de la playlist o del primer video
                      thumbnail = info.get('thumbnail')
                      if not thumbnail and entries:
                          first_entry = entries[0]
-                         # Si es extract_flat, la entrada puede no tener thumbnail.
-                         # Si falta, hacemos una extracción rápida SOLO del primer video para tener ALGO que mostrar.
                          if first_entry:
                              thumbnail = first_entry.get('thumbnail')
                              if not thumbnail and first_entry.get('url'):
                                  try:
-                                      # Extracción ligera del primer video para robar su thumbnail
                                       with yt_dlp.YoutubeDL({'quiet': True}) as ydl_thumb:
                                           info_thumb = ydl_thumb.extract_info(first_entry['url'], download=False)
                                           thumbnail = info_thumb.get('thumbnail')
@@ -121,7 +94,6 @@ class YouTubeService:
                      
                      uploader = info.get('uploader') or info.get('channel') or "Varios"
                      
-                     # Extraer nombres y URLs ROBUSTAMENTE
                      playlist_items = []
                      for e in entries:
                          if not e: continue
@@ -133,11 +105,9 @@ class YouTubeService:
                          vid_duration = e.get('duration_string') or e.get('duration')
                          vid_thumbnail = e.get('thumbnail') 
                          
-                         # Fallback: Construir URL de thumbnail si falta y tenemos ID
                          if not vid_thumbnail and vid_id:
                              vid_thumbnail = f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg"
 
-                         # Formato simple de duración si viene en segundos
                          if isinstance(vid_duration, (int, float)):
                              m, s = divmod(int(vid_duration), 60)
                              if m > 60:
@@ -148,7 +118,6 @@ class YouTubeService:
                          
                          vid_duration = str(vid_duration) if vid_duration else "??"
 
-                         # Construir URL explícita si falta
                          if not vid_url and vid_id:
                              vid_url = f"https://www.youtube.com/watch?v={vid_id}"
                              
@@ -160,7 +129,7 @@ class YouTubeService:
                                  'duration': vid_duration,
                                  'thumbnail': vid_thumbnail
                              })
-                     # Return para Playlist
+
                      return {
                         'type': 'playlist',
                         'title': titulo,
@@ -187,7 +156,7 @@ class YouTubeService:
                         'type': 'video',
                         'title': titulo,
                         'thumbnail': thumbnail,
-                        'duration': dur_str, # Will hold Duration OR Count
+                        'duration': dur_str, 
                         'uploader': uploader,
                         'playlist_items': playlist_items
                     }
@@ -196,12 +165,10 @@ class YouTubeService:
             return None, str(e)
 
     def obtener_calidades_disponibles(self, url: str, video_codec: str = 'any') -> Dict[int, Dict[str, Any]]:
-        # Usamos EXACTAMENTE los mismos argumentos que usaremos para descargar.
         es_mp4 = (video_codec == 'mp4')
         opciones = {'quiet': True, 'no_warnings': True}
         opciones.update(self._get_client_args(es_mp4))
         
-        # Limpieza tambien aqui por seguridad
         url = self._clean_url(url)
 
         try:
@@ -223,7 +190,6 @@ class YouTubeService:
                     
                 duracion = info.get('duration', 0)
                 
-                
                 for formato in formatos:
                     vcodec = formato.get('vcodec', 'none')
                     altura = formato.get('height', 0)
@@ -232,7 +198,6 @@ class YouTubeService:
                     
                     if vcodec == 'none': continue
                     
-                    # Filtros Estrictos
                     is_vp9 = 'vp9' in vcodec or 'vp09' in vcodec
                     is_avc = 'avc' in vcodec or 'h264' in vcodec
                     
@@ -245,7 +210,6 @@ class YouTubeService:
                     
                     if not altura or altura < 144: continue
                     
-                    # Preferir HTTPS directo sobre m3u8
                     proto = formato.get('protocol', '')
                     if 'm3u8' in proto: pass 
 
@@ -276,7 +240,7 @@ class YouTubeService:
                             'nombre': nombre_calidad,
                             'resolucion': f"{formato.get('width',0)}x{altura}",
                             'tamaño': tamaño_total,
-                            'formato_id': formato.get('format_id'), # IMPORTANTE: Usamos este ID para descargar
+                            'formato_id': formato.get('format_id'), 
                             'ext': formato.get('ext', 'mp4'),
                             'fps': fps
                         }
@@ -285,91 +249,12 @@ class YouTubeService:
             return {}
 
     def descargar(self, url: str, tipo: str, formato_id: str = None, audio_format: str = 'mp3', directorio: str = '', 
-                  contenedor: str = 'mp4', progress_callback: Callable = None, status_callback: Callable = None, indices: Optional[list] = None) -> None:
-        
-        # LIMPIEZA CRÍTICA: Asegurar que descargamos lo que analizamos
-        url = self._clean_url(url) # <--- FIX AQUI
-
-        if indices:
-            # Modo Batch (Playlist Manual)
-            self.descargar_playlist_batch(url, indices, tipo, formato_id, audio_format, directorio, contenedor, progress_callback, status_callback)
-        else:
-            # Modo Single (O playlist completa auto gestionada por yt-dlp, pero tratada como single url)
-            self._descargar_single(url, tipo, formato_id, audio_format, directorio, contenedor, progress_callback, status_callback)
-
-    def descargar_playlist_batch(self, url_base: str, items: list, tipo: str, formato_id: str, audio_format: str, directorio: str, 
-                                 contenedor: str, progress_callback: Callable, status_callback: Callable):
-        
-        if not os.path.exists(directorio): os.makedirs(directorio)
-
-        tagging_results = [] # Para el analisis de consenso final
-        
-        total = len(items)
-        for i, item in enumerate(items):
-            target_url = item.get('url')
-            target_title = item.get('title', f"Video {i+1}")
-            
-            if not target_url: continue
-            
-            # Wrapper para progreso relativo
-            def local_progress(val):
-                step = 100 / total
-                base = i * step
-                global_progress = base + (val * step / 100)
-                if progress_callback: progress_callback(global_progress)
-
-            try:
-                # Descargamos individualmente
-                # NOTA: _descargar_single retorna el resultado de etiquetado si hubo musica
-                res = self._descargar_single(target_url, tipo, formato_id, audio_format, directorio, contenedor, local_progress, status_callback)
-                
-                if res and isinstance(res, dict) and 'artist' in res:
-                    res['original_entry'] = item # Guardamos info original para correcciones futuras
-                    tagging_results.append(res)
-                    
-            except Exception as e:
-                print(f"❌ Error descargando item batch '{target_title}': {e}")
-                if status_callback: status_callback(f"⚠️ Error en {target_title[:15]}...")
-
-        # --- ANÁLISIS RETROSPECTIVO (Consistencia de Playlist) ---
-        if tipo == 'musica' and len(tagging_results) > 1:
-             print(f"📊 Analizando consistencia de playlist ({len(tagging_results)} procesadas)...")
-             
-             from collections import Counter
-             found_artists = [res['artist'] for res in tagging_results if res.get('artist') and res['artist'] != "Desconocido"]
-             
-             if found_artists:
-                 most_common_found = Counter(found_artists).most_common(1)
-                 if most_common_found:
-                     dominant_artist = most_common_found[0][0]
-                     count = most_common_found[0][1]
-                     total_tags = len(tagging_results)
-                     
-                     # 60% Consenso
-                     if count >= total_tags * 0.6: 
-                         print(f"⚖️ Consenso de Playlist detectado: '{dominant_artist}' ({count}/{total_tags})")
-                         
-                         for res in tagging_results:
-                             current_artist = res.get('artist')
-                             is_imposter = False
-                             if current_artist and current_artist != dominant_artist:
-                                 # Validar que no contenga al dominante (ej: Feat)
-                                 if dominant_artist.lower() not in current_artist.lower():
-                                     is_imposter = True
-                             
-                             if is_imposter:
-                                 print(f"🕵️ 'Impostor' detectado: '{current_artist}' en '{os.path.basename(res['file_path'])}'. Corrigiendo con '{dominant_artist}'...")
-                                 if status_callback: status_callback(f"🔄 Corrigiendo: {dominant_artist}")
-                                 
-                                 # FORZAR ETIQUETADO con el artista dominante
-                                 # Usamos strict_artist_match=True para evitar que la estrategia backup
-                                 # nos devuelva el mismo resultado incorrecto (ej: Hello Clairo -> Hello -> Adele)
-                                 # Usamos search_title para buscar con el titulo original (ej: "Hello?") en vez del sanetizado ("Hello")
-                                 orig_title = res.get('original_entry', {}).get('title')
-                                 self.metadata_service.etiquetar(res['file_path'], artista_hint=dominant_artist, status_callback=None, strict_artist_match=True, search_title=orig_title)
-
-    def _descargar_single(self, url: str, tipo: str, formato_id: str, audio_format: str, directorio: str, 
-                          contenedor: str, progress_callback: Callable, status_callback: Callable):
+                  contenedor: str = 'mp4', progress_callback: Callable = None, status_callback: Callable = None) -> Optional[str]:
+        """
+        Retorna la ruta del archivo descargado si es exitoso, o None.
+        YA NO realiza etiquetado.
+        """
+        url = self._clean_url(url)
         
         if not os.path.exists(directorio): os.makedirs(directorio)
 
@@ -403,10 +288,9 @@ class YouTubeService:
             'ignoreerrors': False,
             'nocheckcertificate': True,
             'progress_hooks': [hook],
-            'noplaylist': True, # Forzar modo single
+            'noplaylist': True, 
         }
 
-        # Configurar cliente
         es_mp4 = (tipo == 'video' and contenedor == 'mp4')
         opciones.update(self._get_client_args(es_mp4))
         
@@ -434,28 +318,34 @@ class YouTubeService:
                 if contenedor == 'webm': opciones['merge_output_format'] = 'webm'
                 else: opciones['merge_output_format'] = 'mp4'
 
-        tag_result = None
-        
-        with yt_dlp.YoutubeDL(opciones) as ydl:
-            # Descarga real
-            info = ydl.extract_info(url, download=True)
-            
-            # --- ETIQUETADO DE AUDIO ---
-            if tipo == 'musica' and info:
-                # Determinar path final
-                temp_path = ydl.prepare_filename(info)
-                base, _ = os.path.splitext(temp_path)
-                final_path = f"{base}.{audio_format}"
+        try:
+            with yt_dlp.YoutubeDL(opciones) as ydl:
+                info = ydl.extract_info(url, download=True)
                 
-                if os.path.exists(final_path):
-                     # Intentamos obtener hint del single video
-                     artist_hint = info.get('uploader') or info.get('artist') or info.get('channel')
+                # Retornar ruta final
+                if tipo == 'musica' and info:
+                    temp_path = ydl.prepare_filename(info)
+                    base, _ = os.path.splitext(temp_path)
+                    final_path = f"{base}.{audio_format}"
+                    
+                    if os.path.exists(final_path):
+                         # Return tuple: (path, info_dict_for_hints)
+                         return final_path, info
+                elif tipo == 'video' and info:
+                     final_path = ydl.prepare_filename(info)
+                     # yt-dlp a veces cambia ext post merge, pero por ahora confiamos en outtmpl o check
+                     if os.path.exists(final_path):
+                          return final_path, info
                      
-                     if hasattr(self, 'metadata_service'):
-                         tag_result = self.metadata_service.etiquetar(final_path, artista_hint=artist_hint, status_callback=status_callback)
-                else:
-                    print(f"⚠️ Archivo final no hallado para etiquetas: {final_path}")
+                     # Check with merged extension if failed
+                     base, _ = os.path.splitext(final_path)
+                     ext = opciones.get('merge_output_format') or contenedor
+                     path_merged = f"{base}.{ext}"
+                     if os.path.exists(path_merged):
+                         return path_merged, info
+                         
+        except Exception as e:
+            print(f"Error descarga: {e}")
+            return None, None
 
-        return tag_result
-
-
+        return None, None

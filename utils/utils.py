@@ -1,5 +1,4 @@
 import os
-# v1.3.1
 
 class Utils:
     """Funciones de utilidad estáticas."""
