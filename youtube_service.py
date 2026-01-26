@@ -44,17 +44,26 @@ class YouTubeService:
                             return clean
 
             # 2. Si NO se limpió (no era Mix) y sigue teniendo list=, forzamos modo Playlist
-            # (Este era el comportamiento original, útil para URLs de playlists pegadas)
-            # Solo si NO tiene video ID (o si el usuario explícitamente pegó una playlist)
-            # PERO si tiene v= y list= (y no es RD), yt-dlp prioriza list si no limpiamos.
-            # Decision: Si el servicio lo llama para "single", debería ser single. 
-            pass 
+            if 'list=' in url and 'v=' in url:
+                # Re-parsear por si acaso (o reusar logic anterior si refactorizas)
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(url)
+                qs = parse_qs(parsed.query)
+                if 'list' in qs:
+                    list_id = qs['list'][0]
+                    # Si NO es Mix (ya filtrado arriba o validado aqui)
+                    if not list_id.startswith('RD'):
+                         clean = f"https://www.youtube.com/playlist?list={list_id}"
+                         print(f"📂 Link convertido a Playlist pura: {clean}")
+                         return clean
         except:
             pass
         return url
 
     def obtener_info_basica(self, url: str) -> Tuple[Optional[Dict[str, Any]], str]:
         opciones = {'quiet': True, 'no_warnings': True, 'extract_flat': True}
+        # options.update(self._get_client_args(is_mp4=False)) # REVERTIDO: Provoca que las playlists no se detecten bien en UI
+
         try:
             # Priorizar Playlist: Si el link tiene &list=, lo transformamos a link de playlist puro
             # Limpieza centralizada
@@ -77,8 +86,14 @@ class YouTubeService:
             # Usamos la URL limpia para la extracción
             with yt_dlp.YoutubeDL(opciones) as ydl:
                 info = ydl.extract_info(url_limpia, download=False)
+                
+                # Debugging
+                _type = info.get('_type', 'video')
+                has_entries = 'entries' in info
+                print(f"🕵️ Extraction Info: Type={_type}, HasEntries={has_entries}, Title={info.get('title')}")
+
                 # Procesar duración y Tipo
-                es_playlist = info.get('_type') == 'playlist' or 'entries' in info
+                es_playlist = _type == 'playlist' or has_entries
                 
                 if es_playlist:
                      titulo = info.get('title', 'Playlist Desconocida')
@@ -388,6 +403,7 @@ class YouTubeService:
             'ignoreerrors': False,
             'nocheckcertificate': True,
             'progress_hooks': [hook],
+            'noplaylist': True, # Forzar modo single
         }
 
         # Configurar cliente

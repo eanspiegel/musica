@@ -360,7 +360,6 @@ class MetadataService:
                              if status_callback: status_callback(f"✨ Renombrado: {nuevo_nombre}")
                              return {'artist': artista, 'album': album, 'title': titulo, 'file_path': nueva_ruta}
                          else:
-                             # Lógica básica colisiones no-crítica aquí
                              pass 
             
             if datos_encontrados:
