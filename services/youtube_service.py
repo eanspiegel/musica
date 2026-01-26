@@ -1,7 +1,7 @@
 import os
 import yt_dlp
 from typing import Optional, Tuple, Dict, Any, Callable
-from config_manager import ConfigManager
+from config.config_manager import ConfigManager
 from utils.utils import Utils
 
 class YouTubeService:

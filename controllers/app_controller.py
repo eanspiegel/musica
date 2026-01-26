@@ -1,7 +1,7 @@
-from settings import APP_VERSION
+from config.settings import APP_VERSION
 import threading
 from typing import Optional, Callable
-from config_manager import ConfigManager
+from config.config_manager import ConfigManager
 from services.youtube_service import YouTubeService
 from services.metadata_service import MetadataService
 from services.playlist_service import PlaylistService
