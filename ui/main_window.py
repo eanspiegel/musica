@@ -183,16 +183,15 @@ class MainWindow(tk.Tk):
             on_start_download=lambda: self.iniciar_descarga_final(es_video=True, is_playlist=is_playlist)
         )
 
-    def mostrar_selector_calidad_inline(self, calidades, result_container, event_obj):
+    def mostrar_selector_calidad_inline(self, calidades, result_container, event_obj, video_fmt_name):
         self._limpiar_frame_dinamico()
         
         def on_select(fid):
             result_container['fid'] = fid
             event_obj.set()
         
-        video_fmt = self.download_options.get_video_format() if self.download_options else "mp4"
         qs = QualitySelectorPanel(self.dynamic_frame, calidades, on_select)
-        qs.build(video_fmt)
+        qs.build(video_fmt_name)
         qs.pack(fill=tk.BOTH, expand=True)
 
     def iniciar_descarga_final(self, es_video, is_playlist=False):
@@ -225,7 +224,9 @@ class MainWindow(tk.Tk):
             if calidades:
                 res = {'fid': 'CANCEL'}
                 ev = threading.Event()
-                self.after(0, self.mostrar_selector_calidad_inline, calidades, res, ev)
+                res = {'fid': 'CANCEL'}
+                ev = threading.Event()
+                self.after(0, self.mostrar_selector_calidad_inline, calidades, res, ev, video_fmt)
                 ev.wait()
                 formato_id = res['fid']
                 if formato_id == 'CANCEL':

@@ -12,13 +12,7 @@ class YouTubeService:
         # Eliminada dependencia de MetadataService
 
     def _get_client_args(self, is_mp4: bool) -> dict:
-        return {
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web']
-                }
-            }
-        }
+        return {}
 
     def _clean_url(self, url: str) -> str:
         try:
@@ -196,17 +190,19 @@ class YouTubeService:
                     ext = formato.get('ext')
                     fid = formato.get('format_id')
                     
+                    print(f"DEBUG-FMT: {fid} | {ext} | {altura}p | {vcodec}")
+
                     if vcodec == 'none': continue
                     
                     is_vp9 = 'vp9' in vcodec or 'vp09' in vcodec
                     is_avc = 'avc' in vcodec or 'h264' in vcodec
                     
-                    if video_codec == 'webm' and not is_vp9 and ext != 'webm': 
-                        continue
+                    # if video_codec == 'webm' and not is_vp9 and ext != 'webm': 
+                    #     continue
                         
-                    if video_codec == 'mp4':
-                        if not is_avc and ext != 'mp4':
-                            continue
+                    # if video_codec == 'mp4':
+                    #     if not is_avc and ext != 'mp4':
+                    #         continue
                     
                     if not altura or altura < 144: continue
                     
@@ -227,13 +223,31 @@ class YouTubeService:
                     
                     if is_vp9: nombre_calidad += ' (VP9)'
                     
+                    # Preference logic
+                    matches_preference = False
+                    if video_codec == 'webm':
+                        if is_vp9 or ext == 'webm': matches_preference = True
+                    elif video_codec == 'mp4':
+                        if is_avc or ext == 'mp4': matches_preference = True
+                    else:
+                        matches_preference = True
+
                     actualizar = False
-                    if altura not in calidades: actualizar = True
+                    if altura not in calidades: 
+                        actualizar = True
                     else:
                         info_existente = calidades[altura]
-                        if fps > info_existente['fps']: actualizar = True
-                        elif fps == info_existente['fps']:
-                            if tamaño_total > info_existente['tamaño']: actualizar = True
+                        prev_pref = info_existente.get('preferred', False)
+                        
+                        if matches_preference and not prev_pref:
+                            actualizar = True
+                        elif not matches_preference and prev_pref:
+                            actualizar = False
+                        else:
+                            # Tie-breakers if preference status is equal
+                            if fps > info_existente['fps']: actualizar = True
+                            elif fps == info_existente['fps']:
+                                if tamaño_total > info_existente['tamaño']: actualizar = True
 
                     if actualizar:
                         calidades[altura] = {
@@ -242,7 +256,8 @@ class YouTubeService:
                             'tamaño': tamaño_total,
                             'formato_id': formato.get('format_id'), 
                             'ext': formato.get('ext', 'mp4'),
-                            'fps': fps
+                            'fps': fps,
+                            'preferred': matches_preference
                         }
                 return calidades
         except Exception as e:
@@ -257,6 +272,8 @@ class YouTubeService:
         url = self._clean_url(url)
         
         if not os.path.exists(directorio): os.makedirs(directorio)
+        
+        print(f"DEBUG: descargar() args -> tipo={tipo}, formato_id={formato_id}, contenedor={contenedor}, ffmpeg={Utils.verificar_ffmpeg()}")
 
         def hook(d):
             if d['status'] == 'downloading':
@@ -314,12 +331,22 @@ class YouTubeService:
             else:
                 if contenedor == 'webm':
                     opciones['format'] = 'bestvideo[vcodec*=vp9]+bestaudio/best'
-                else:
-                    opciones['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
-            
             if ffmpeg_ok:
-                if contenedor == 'webm': opciones['merge_output_format'] = 'webm'
-                else: opciones['merge_output_format'] = 'mp4'
+                # Si hay FFmpeg, pedimos la MEJOR calidad absoluta (aunque sea VP9) y la convertimos
+                target_format = f"{formato_id}+bestaudio/best" if formato_id else 'bestvideo+bestaudio/best'
+                
+                if contenedor == 'webm': 
+                    opciones['format'] = target_format
+                    opciones['merge_output_format'] = 'webm'
+                else: 
+                    opciones['format'] = target_format
+                    opciones['merge_output_format'] = 'mp4'
+            else:
+                 # Si NO hay FFmpeg, estamos obligados a pedir el formato nativo exacto
+                 if contenedor == 'webm':
+                      opciones['format'] = 'bestvideo[ext=webm]+bestaudio/best'
+                 else:
+                      opciones['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
 
         try:
             with yt_dlp.YoutubeDL(opciones) as ydl:
