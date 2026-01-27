@@ -27,7 +27,6 @@ class Utils:
                 startupinfo=startupinfo,
                 timeout=3
             )
-            print(f"DEBUG: FFmpeg exit code: {resultado.returncode}")
             return resultado.returncode == 0
         except:
             return False

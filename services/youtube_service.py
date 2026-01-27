@@ -190,8 +190,6 @@ class YouTubeService:
                     ext = formato.get('ext')
                     fid = formato.get('format_id')
                     
-                    print(f"DEBUG-FMT: {fid} | {ext} | {altura}p | {vcodec}")
-
                     if vcodec == 'none': continue
                     
                     is_vp9 = 'vp9' in vcodec or 'vp09' in vcodec
@@ -272,8 +270,6 @@ class YouTubeService:
         url = self._clean_url(url)
         
         if not os.path.exists(directorio): os.makedirs(directorio)
-        
-        print(f"DEBUG: descargar() args -> tipo={tipo}, formato_id={formato_id}, contenedor={contenedor}, ffmpeg={Utils.verificar_ffmpeg()}")
 
         def hook(d):
             if d['status'] == 'downloading':
