@@ -302,8 +302,13 @@ class YouTubeService:
             'nocheckcertificate': True,
             'progress_hooks': [hook],
             'noplaylist': True, 
+            'retries': 3,
+            'file_access_retries': 3,
+            'fragment_retries': 3,
+            # Simular cliente móvil para evitar bloqueos 403 de la versión Web
+            'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
         }
-
+        
         es_mp4 = (tipo == 'video' and contenedor == 'mp4')
         opciones.update(self._get_client_args(es_mp4))
         
@@ -371,7 +376,11 @@ class YouTubeService:
                          return path_merged, info
                          
         except Exception as e:
-            print(f"Error descarga: {e}")
+            msg = str(e)
+            if "403" in msg or "Forbidden" in msg:
+                print(f"🔒 Acceso denegado (403) en '{url}'. Saltando...")
+            else:
+                print(f"Error descarga: {e}")
             return None, None
 
         return None, None
