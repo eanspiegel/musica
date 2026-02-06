@@ -14,6 +14,8 @@ python -m pip install -r requirements.txt
 
 ```
 
+## notas 1.6.0
+- agregué una vaina para buscar otros metadatos en canciones por separado.(Lo hice porque aveces se pone el single en vez del album)
 ## Notas v1.5.0
 
 -Refactorización y ahora usa Shazam para obtener los metadatos
