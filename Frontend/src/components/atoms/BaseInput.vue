@@ -21,7 +21,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
     :value="modelValue"
     :placeholder="placeholder"
     :disabled="disabled"
-    class="w-full bg-gray-800 text-white placeholder-gray-500 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+    class="input-base"
     @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
   />
 </template>

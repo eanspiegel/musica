@@ -3,13 +3,17 @@ import { computed } from 'vue'
 
 interface Props {
   label: string
-  variant?: 'primary' | 'secondary' | 'danger'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+  size?: 'sm' | 'md' | 'lg'
+  pill?: boolean
   loading?: boolean
   disabled?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   variant: 'primary',
+  size: 'md',
+  pill: false,
   loading: false,
   disabled: false,
 })
@@ -17,14 +21,26 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{ click: [] }>()
 
 const classes = computed(() => {
-  const base =
-    'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed'
-  const variants = {
-    primary: 'bg-indigo-600 hover:bg-indigo-500 text-white',
-    secondary: 'bg-gray-700 hover:bg-gray-600 text-white',
-    danger: 'bg-red-600 hover:bg-red-500 text-white',
+  const variantMap: Record<string, string> = {
+    primary: 'btn-primary',
+    secondary: 'btn-secondary',
+    ghost: 'btn-ghost',
+    danger: 'btn-danger',
   }
-  return [base, variants[props.variant]]
+
+  const sizeMap: Record<string, string> = {
+    sm: 'btn-sm',
+    md: '',
+    lg: 'btn-lg',
+  }
+
+  return [
+    variantMap[props.variant],
+    sizeMap[props.size],
+    props.pill ? 'btn-pill' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 })
 </script>
 
@@ -37,10 +53,11 @@ const classes = computed(() => {
   >
     <svg
       v-if="loading"
-      class="animate-spin h-4 w-4"
+      class="animate-spin h-4 w-4 shrink-0"
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
+      aria-hidden="true"
     >
       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
       <path

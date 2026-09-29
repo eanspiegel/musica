@@ -14,6 +14,17 @@ python -m pip install -r requirements.txt
 
 ```
 
+## Notas v2.0.0 (Migración a Web / Frontend + Backend)
+
+- **Nueva Arquitectura:** Se migró el proyecto de un script de consola/Tkinter a una arquitectura moderna Cliente-Servidor.
+- **Backend (FastAPI):** Lógica refactorizada con inyección de dependencias, adaptadores (Shazam, yt-dlp, Mutagen) y soporte para tareas asíncronas.
+- **Frontend (Vue 3 + Tailwind):** Nueva interfaz con sistema de diseño inspirado en Spotify y Apple Design (animaciones fluidas, variables CSS y diseño atómico).
+- **Correcciones en el Descargador (yt-dlp):**
+  - Limpieza automática de URLs de YouTube (se ignoran playlists falsas de "Mix/Radios" tipo `list=RD`).
+  - Detección precisa de playlists reales: se reescribe el enlace a `/playlist?list=...` para garantizar que baje la lista completa y no solo un video.
+  - Resolución de errores al extraer archivos `.opus`, buscando el archivo correcto generado por FFmpeg.
+  - Polling seguro en la UI para evitar peticiones infinitas cuando falla una descarga.
+
 ## notas 1.6.0
 - agregué una vaina para buscar otros metadatos en canciones por separado.(Lo hice porque aveces se pone el single en vez del album)
 ## Notas v1.5.0

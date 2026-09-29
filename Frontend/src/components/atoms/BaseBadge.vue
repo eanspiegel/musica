@@ -3,29 +3,26 @@ import { computed } from 'vue'
 
 interface Props {
   label: string
-  color?: 'green' | 'red' | 'yellow' | 'blue' | 'gray'
+  color?: 'brand' | 'success' | 'warning' | 'error' | 'info' | 'neutral'
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  color: 'gray',
+  color: 'neutral',
 })
 
-const colorClasses = computed(() => {
-  const map = {
-    green: 'bg-green-800 text-green-200',
-    red: 'bg-red-800 text-red-200',
-    yellow: 'bg-yellow-800 text-yellow-200',
-    blue: 'bg-blue-800 text-blue-200',
-    gray: 'bg-gray-700 text-gray-300',
+const colorClass = computed(() => {
+  const map: Record<string, string> = {
+    brand: 'badge-brand',
+    success: 'badge-success',
+    warning: 'badge-warning',
+    error: 'badge-error',
+    info: 'badge-info',
+    neutral: 'badge-neutral',
   }
   return map[props.color]
 })
 </script>
 
 <template>
-  <span
-    :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', colorClasses]"
-  >
-    {{ label }}
-  </span>
+  <span :class="colorClass">{{ label }}</span>
 </template>

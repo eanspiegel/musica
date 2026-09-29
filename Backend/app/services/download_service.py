@@ -154,7 +154,7 @@ class DownloadService:
             logger.error("_run_download: job %s not found", job_id)
             return
 
-        job.status = "downloading"
+        job.status = "running"
 
         def on_progress(percent: float, eta: str) -> None:
             job.progress = percent

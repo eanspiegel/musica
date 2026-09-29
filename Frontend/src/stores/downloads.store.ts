@@ -50,8 +50,17 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }
   }
 
+  const POLL_INTERVAL_MS = 2000
+  const POLL_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes safety cap
+
   function pollJob(id: string): void {
+    const started = Date.now()
     const interval = setInterval(async () => {
+      // Safety timeout — stop polling if the job is hung
+      if (Date.now() - started > POLL_TIMEOUT_MS) {
+        clearInterval(interval)
+        return
+      }
       try {
         const updated = await downloadsApi.getById(id)
         const index = jobs.value.findIndex((j) => j.id === id)
@@ -64,7 +73,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
       } catch {
         clearInterval(interval)
       }
-    }, 1500)
+    }, POLL_INTERVAL_MS)
   }
 
   return {

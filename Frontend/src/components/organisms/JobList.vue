@@ -11,14 +11,14 @@ interface Props {
 defineProps<Props>()
 const emit = defineEmits<{ cancel: [id: string] }>()
 
-type BadgeColor = 'green' | 'red' | 'yellow' | 'blue' | 'gray'
+type BadgeColor = 'brand' | 'success' | 'warning' | 'error' | 'info' | 'neutral'
 
 function badgeColor(status: DownloadJob['status']): BadgeColor {
   const map: Record<DownloadJob['status'], BadgeColor> = {
-    pending: 'yellow',
-    running: 'blue',
-    done: 'green',
-    failed: 'red',
+    pending: 'warning',
+    running: 'info',
+    done: 'success',
+    failed: 'error',
   }
   return map[status]
 }
@@ -33,11 +33,11 @@ function truncateUrl(url: string, max = 60): string {
     <li
       v-for="job in jobs"
       :key="job.id"
-      class="bg-gray-800 rounded-xl p-4 space-y-3"
+      class="card p-4 space-y-3"
     >
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-gray-300 truncate" :title="job.url">
+          <p class="text-body text-secondary truncate" :title="job.url">
             {{ truncateUrl(job.url) }}
           </p>
         </div>
@@ -47,6 +47,7 @@ function truncateUrl(url: string, max = 60): string {
             v-if="job.status === 'pending' || job.status === 'running'"
             label="Cancel"
             variant="danger"
+            size="sm"
             @click="emit('cancel', job.id)"
           />
         </div>
@@ -58,11 +59,13 @@ function truncateUrl(url: string, max = 60): string {
         :status="`${job.progress}%`"
       />
 
-      <p v-if="job.status === 'done' && job.file_path" class="text-xs text-green-400">
+      <p v-if="job.status === 'done' && job.file_path" class="text-caption text-brand">
         Saved to: {{ job.file_path }}
       </p>
 
-      <p v-if="job.error" class="text-xs text-red-400">{{ job.error }}</p>
+      <p v-if="job.error" class="text-caption" style="color: var(--color-error)">
+        {{ job.error }}
+      </p>
     </li>
   </ul>
 </template>
