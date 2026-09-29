@@ -1,5 +1,0 @@
-yt-dlp
-mutagen
-requests
-Pillow
-shazamio
