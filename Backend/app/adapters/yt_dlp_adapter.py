@@ -27,6 +27,7 @@ def _clean_url(url: str) -> str:
     """Normalize a YouTube URL before handing it to yt-dlp.
 
     Rules:
+    - Allow ytsearch prefixes untouched.
     - Strip tracking/session params that add no meaning (si, pp, index, etc.).
     - If ``list`` starts with ``RD`` (radio/mix) or ``start_radio=1`` is present,
       remove both so the URL resolves as a plain video — radio queues are not
@@ -35,6 +36,9 @@ def _clean_url(url: str) -> str:
       ``/playlist?list=...`` so yt-dlp resolves the full playlist instead of
       the individual video referenced by ``v=``.
     """
+    if url.startswith("ytsearch"):
+        return url
+
     parsed = urlparse(url)
     qs = parse_qs(parsed.query, keep_blank_values=False)
 
@@ -67,6 +71,9 @@ def _clean_url(url: str) -> str:
 
 def _validate_url(url: str) -> None:
     """TD-03 fix: allowlist validation before passing any URL to yt-dlp."""
+    if url.startswith("ytsearch"):
+        return
+        
     parsed = urlparse(url)
     if parsed.scheme not in _ALLOWED_SCHEMES:
         raise ValueError(f"Disallowed URL scheme: '{parsed.scheme}'.")
@@ -178,38 +185,32 @@ def _download_sync(
 
     logger.info("Starting download — url=%s format_type=%s", url, format_type)
 
-    # Snapshot files before download to detect new files reliably
-    before = set(glob.glob(os.path.join(directory, "*")))
-    started_at = time.time()
-
+    # Prepare the downloader
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         if not info:
+            logger.error("Failed to extract info for url=%s", url)
             return None
-
-    # Find the newest file added since we started — handles restrictfilenames
-    # mangling and FFmpeg rename chains (e.g. .webm → .mp3)
-    expected_ext = audio_format if format_type == "music" else container
-    after = set(glob.glob(os.path.join(directory, "*")))
-    new_files = [
-        f for f in (after - before)
-        if f.lower().endswith(f".{expected_ext.lower()}")
-    ]
-
-    if new_files:
-        # Prefer the file modified most recently in case of ties
-        return max(new_files, key=os.path.getmtime)
-
-    # Fallback: look for any file newer than our start time with the right ext
-    all_matches = [
-        f for f in glob.glob(os.path.join(directory, f"*.{expected_ext}"))
-        if os.path.getmtime(f) >= started_at
-    ]
-    if all_matches:
-        return max(all_matches, key=os.path.getmtime)
-
-    logger.warning("Could not locate output file in %s for ext=%s", directory, expected_ext)
-    return None
+            
+        # Determine the exact output file path
+        # ydl.prepare_filename returns the initial file name (e.g. video.webm).
+        # Since we use postprocessors to convert formats, the final file will
+        # have the same base name but with the requested extension.
+        expected_ext = audio_format if format_type == "music" else container
+        initial_filename = ydl.prepare_filename(info)
+        base_path, _ = os.path.splitext(initial_filename)
+        final_file = f"{base_path}.{expected_ext}"
+        
+        # Some yt-dlp versions or specific formats might preserve the original extension
+        # if no conversion was needed, so we check existence.
+        if os.path.exists(final_file):
+            return final_file
+            
+        if os.path.exists(initial_filename):
+            return initial_filename
+            
+        logger.warning("Expected output file not found: %s", final_file)
+        return None
 
 
 # ---------------------------------------------------------------------------

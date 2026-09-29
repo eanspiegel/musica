@@ -19,10 +19,15 @@ python -m pip install -r requirements.txt
 - **Nueva Arquitectura:** Se migró el proyecto de un script de consola/Tkinter a una arquitectura moderna Cliente-Servidor.
 - **Backend (FastAPI):** Lógica refactorizada con inyección de dependencias, adaptadores (Shazam, yt-dlp, Mutagen) y soporte para tareas asíncronas.
 - **Frontend (Vue 3 + Tailwind):** Nueva interfaz con sistema de diseño inspirado en Spotify y Apple Design (animaciones fluidas, variables CSS y diseño atómico).
+- **Segunda Fase (UI YouTube Clone & Cart):**
+  - Se rediseñó completamente la interfaz principal (`/`) para que funcione como un clon visual de YouTube (buscador global, grid adaptativo de 16:9).
+  - Integración nativa con las búsquedas de YouTube usando `ytsearch:` directamente en el backend, saltándose la validación estricta HTTP para este caso de uso.
+  - Se implementó un flujo de **"Carrito de Descargas"** (`/queue`). Las selecciones se guardan en el `localStorage` (persistencia) y luego el usuario elige globalmente el formato antes de despachar todo el lote.
+  - Monitor de estado en vivo (`/downloads`) para ver el progreso real de las conversiones de múltiples hilos.
 - **Correcciones en el Descargador (yt-dlp):**
   - Limpieza automática de URLs de YouTube (se ignoran playlists falsas de "Mix/Radios" tipo `list=RD`).
   - Detección precisa de playlists reales: se reescribe el enlace a `/playlist?list=...` para garantizar que baje la lista completa y no solo un video.
-  - Resolución de errores al extraer archivos `.opus`, buscando el archivo correcto generado por FFmpeg.
+  - Corrección de **Race Conditions (WinError 32)** durante descargas en paralelo. Se eliminó la captura de estado de carpetas y se implementó predicción determinista de nombres (`ydl.prepare_filename`) para evitar que hilos concurrentes bloqueen el postprocesamiento de FFmpeg.
   - Polling seguro en la UI para evitar peticiones infinitas cuando falla una descarga.
 
 ## notas 1.6.0

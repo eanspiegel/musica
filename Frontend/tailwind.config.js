@@ -74,6 +74,15 @@ export default {
         deliberate: '350ms',
         page: '400ms',
       },
+      keyframes: {
+        'fade-in': {
+          '0%': { opacity: '0', transform: 'translateY(-10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        }
+      },
+      animation: {
+        'fade-in': 'fade-in 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
+      }
     },
   },
   plugins: [],

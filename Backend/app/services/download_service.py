@@ -23,6 +23,8 @@ _ALLOWED_HOSTS = {
 
 
 def _validate_url(url: str) -> None:
+    if url.startswith("ytsearch"):
+        return
     parsed = urlparse(url)
     if parsed.scheme not in _ALLOWED_SCHEMES:
         raise ValueError(f"Disallowed URL scheme: '{parsed.scheme}'")

@@ -9,14 +9,14 @@ export const router = createRouter({
       component: () => import('@/views/HomeView.vue'),
     },
     {
-      path: '/download',
-      name: 'download',
-      component: () => import('@/views/DownloadView.vue'),
+      path: '/queue',
+      name: 'queue',
+      component: () => import('@/views/QueueView.vue'),
     },
     {
-      path: '/playlist',
-      name: 'playlist',
-      component: () => import('@/views/PlaylistView.vue'),
+      path: '/downloads',
+      name: 'downloads',
+      component: () => import('@/views/DownloadsView.vue'),
     },
     {
       path: '/tags',
