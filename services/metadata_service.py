@@ -448,7 +448,10 @@ class MetadataService:
                  audio['YEAR'] = str(anio)
             
             if letra:
+                 # Guardar letra en múltiples campos para máxima compatibilidad
                  audio['LYRICS'] = letra
+                 audio['UNSYNCEDLYRICS'] = letra
+                 audio['UNSYNCED LYRICS'] = letra
 
             if imagen_url:
                 try:

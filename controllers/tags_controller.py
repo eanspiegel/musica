@@ -1,7 +1,4 @@
-"""
-Controlador para el editor de tags.
-Maneja la lógica de negocio entre la UI y los servicios.
-"""
+
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3, APIC, ID3NoHeaderError
 from mutagen.oggopus import OggOpus
@@ -12,7 +9,6 @@ from services.tags_search_service import TagsSearchService
 
 
 class TagsController:
-    """Controlador para gestionar operaciones de tags."""
     
     def __init__(self):
         self.search_service = TagsSearchService()
@@ -256,7 +252,6 @@ class TagsController:
         return self.search_service.descargar_imagen(url)
     
     def cargar_archivos_carpeta(self, carpeta: str) -> list:
-        """Carga todos los archivos de audio de una carpeta."""
         archivos = []
         extensiones = ('.mp3', '.opus', '.flac')
         

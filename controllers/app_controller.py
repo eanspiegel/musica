@@ -7,10 +7,7 @@ from services.metadata_service import MetadataService
 from services.playlist_service import PlaylistService
 
 class AppController:
-    """
-    Controlador principal de la aplicación.
-    Coordina la UI con los servicios de Youtube y Metadatos.
-    """
+
     
     def __init__(self):
         self.config_manager = ConfigManager()
@@ -59,19 +56,7 @@ class AppController:
                 else:
                     # Modo Single
                     tipo = 'video' if is_video else 'musica'
-                    
-                    # Si es video simple, necesitamos buscar calidades AQUI o en la UI?
-                    # En la arquitectura original, la UI buscaba calidades y bloqueaba.
-                    # El controlador debería exponer un metodo `get_qualities`
-                    # Pero si `formato_id` viene None, asumimos mejor o auto.
-                    
-                    # Para simplificar refactor, asumimos que si es VIDEO y NO PLAYLIST,
-                    # la UI ya pidió calidades via `get_qualities` antes de llamar a start_download.
-                    # Aquí solo ejecutamos.
-                    
-                    # Nota: La UI original pasaba `formato_id`.
-                    # Si start_download_thread recibe `formato_id`, lo usamos.
-                    # Pero en este signature no lo puse. Agreguemoslo.
+                               
                     pass # Fix logic below
                 
                 if finished_callback: finished_callback(True, "Descarga completada")
